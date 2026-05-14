@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>POS Sistema</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- === VISTA POS === -->
+    <div id="pos-view">
+        <header id="pos-header" class="flex items-center justify-between">
+            <div id="logo-trigger" class="cursor-pointer">🍔 MI POS</div>
+            <div class="cart-icon" onclick="abrirCarrito()">
+                🛒 <span id="cart-count" class="cart-badge">0</span>
+            </div>
+        </header>
+
+        <!-- BOTÓN VOLVER AGREGADO -->
+        <div id="pos-back-btn" onclick="renderCategories()">⬅ Volver a Categorías</div>
+
+        <main>
+            <!-- Contenedor Categorías (Visible al inicio) -->
+            <div id="category-container" class="product-grid" style="padding-top:1rem;"></div>
+
+            <!-- Contenedor Productos (Oculto al inicio) -->
+            <div id="product-container" class="product-grid hidden" style="padding-top:1rem;"></div>
+        </main>
+    </div>
+
+    <!-- === VISTA ADMIN === -->
+    <div id="admin-view" class="hidden">
+        <button class="admin-toggle-btn" onclick="toggleSidebar()">☰</button>
+        <nav class="admin-sidebar" id="sidebar">
+            <div class="p-4 text-center font-bold">ADMIN PANEL</div>
+            <div class="admin-nav-item" onclick="navTo('inicio')">🏠 Inicio</div>
+            <div class="admin-nav-item" onclick="navTo('rentabilidad')">📈 Rentabilidad</div>
+            <div class="admin-nav-item" onclick="navTo('reportes')">📑 Reportes</div>
+            <div class="admin-nav-item" onclick="navTo('productos')">🍔 Productos</div>
+            <div class="admin-nav-item" onclick="navTo('configuracion')">⚙️ Configuración</div>
+            <div class="mt-auto p-4">
+                <button onclick="exitAdmin()" class="w-full p-2 bg-red-600 text-white rounded"
+                    style="width:100%; padding:0.5rem; background:var(--danger); color:white; border:none; border-radius:4px;">Salir</button>
+            </div>
+        </nav>
+        <section class="admin-content" id="admin-content-area"></section>
+    </div>
+
+    <!-- === MODAL LOGIN === -->
+    <div id="login-modal" class="modal-overlay hidden open"> <!-- Open por defecto para login inicial -->
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">Acceso Admin</span>
+                <button id="close-login" class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body text-center">
+                <input type="password" id="admin-pin" class="input-field" placeholder="Clave (1234)" maxlength="4">
+                <button id="btn-verify-pin" class="btn btn-primary">Entrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODAL DETALLE PRODUCTO (POS) === -->
+    <div id="modal-product" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">Personalizar Pedido</span>
+                <button class="close-modal" onclick="closeModal('modal-product')">&times;</button>
+            </div>
+            <div class="modal-body text-center">
+                <h3 id="modal-prod-name" class="font-bold text-xl mb-2"></h3>
+                <p id="modal-prod-price" class="text-gray-600 mb-2"></p>
+                <p id="modal-prod-stock" class="text-sm text-gray-400 mb-4"></p>
+
+                <!-- AGREGADO: CONTADOR DE CANTIDAD -->
+                <div class="qty-control">
+                    <button class="qty-btn" onclick="changeQty(-1)">-</button>
+                    <span id="modal-qty-val" class="qty-val">1</span>
+                    <button class="qty-btn" onclick="changeQty(1)">+</button>
+                </div>
+
+                <label class="input-label text-left">Ingredientes / Contornos</label>
+                <div id="modal-ing-list" class="ingredients-list justify-center"></div>
+
+                <div class="mt-6">
+                    <button onclick="addToCart(false)" class="btn btn-primary">Agregar y Volver</button>
+                    <button onclick="addToCart(true)" class="btn btn-secondary">Agregar y Mantener</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODAL CREAR PRODUCTO (ADMIN) === -->
+    <div id="modal-create-product" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title" id="modal-create-title">Nuevo Producto</span>
+                <button class="close-modal" onclick="closeModal('modal-create-product')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-prod-id"> <!-- ID oculto para edición -->
+
+                <div class="input-group">
+                    <label class="input-label">Nombre del Producto</label>
+                    <input type="text" id="new-prod-name" class="input-field" placeholder="Ej: Hamburguesa Doble">
+                </div>
+
+                <!-- Select de Categoría -->
+                <div class="input-group">
+                    <label class="input-label">Categoría</label>
+                    <select id="new-prod-cat" class="input-field">
+                        <!-- Se llena con JS -->
+                    </select>
+                </div>
+
+                <!-- Precio USD (Se elimina el Stock duplicado de aquí) -->
+                <div class="flex gap-2">
+                    <div class="input-group w-full">
+                        <label class="input-label">Precio ($)</label>
+                        <input type="number" id="new-prod-price-usd" class="input-field" placeholder="0.00">
+                    </div>
+                </div>
+
+                <!-- BLOQUE CORRECTO DE STOCK (Con lógica de suma/resta) -->
+                <div class="input-group">
+                    <label class="input-label" id="lbl-stock-mode">Stock Inicial</label>
+                    <input type="number" id="new-prod-stock" class="input-field" placeholder="0">
+
+                    <p id="current-stock-display" class="text-sm text-gray-500 mt-1 hidden">
+                        Stock Actual: <span id="val-current-stock" class="font-bold">0</span>
+                    </p>
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Ingredientes (Separados por coma)</label>
+                    <input type="text" id="new-prod-ings" class="input-field" placeholder="Pan, Queso, Tomate...">
+                </div>
+
+                <button onclick="saveProduct()" class="btn btn-success">Guardar Producto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODAL CONFIRMACIÓN (GENÉRICO) === -->
+    <div id="modal-confirm" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">¿Estás seguro?</span>
+                <button class="close-modal" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body text-center">
+                <p id="confirm-msg" class="mb-4">¿Deseas realizar esta acción?</p>
+                <div class="flex gap-2">
+                    <button onclick="executeConfirm()" class="btn btn-danger w-full">Sí, Eliminar</button>
+                    <button onclick="closeConfirmModal()" class="btn btn-secondary w-full">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODAL CARRITO Y COBRO === -->
+    <div id="modal-cart" class="modal-overlay">
+        <div class="modal-card" style="max-width: 500px;">
+            <div class="modal-header">
+                <span class="modal-title">Detalle del Pedido</span>
+                <button class="close-modal" onclick="closeModal('modal-cart')">&times;</button>
+            </div>
+            <div class="modal-body">
+
+                <div id="cart-items-container" style="max-height: 200px; overflow-y: auto; margin-bottom: 1rem;">
+                    <!-- Se llena con JS -->
+                </div>
+
+                <h4 class="mb-2 font-bold">Métodos de Pago</h4>
+                <div class="payments-section" id="payments-container">
+
+                    <div class="payment-row">
+                        <span class="pay-label">💵 Efectivo Bs</span>
+                        <input type="number" id="pay-efectivo" class="payment-input" placeholder="0.00"
+                            oninput="calculateTotals()">
+                    </div>
+
+                    <div class="payment-row">
+                        <span class="pay-label">📱 Pago Móvil</span>
+                        <input type="number" id="pay-pm" class="payment-input" placeholder="0.00"
+                            oninput="calculateTotals()">
+                    </div>
+
+                    <div class="payment-row">
+                        <span class="pay-label">💳 Punto (Bs)</span>
+                        <input type="number" id="pay-punto" class="payment-input" placeholder="0.00"
+                            oninput="calculateTotals()">
+                    </div>
+
+                    <div class="payment-row">
+                        <span class="pay-label">💲 Divisa ($)</span>
+                        <input type="number" id="pay-divisa" class="payment-input" placeholder="0.00"
+                            oninput="calculateTotals()">
+                    </div>
+
+                </div>
+
+                <!-- Totales -->
+                <div class="totals-box">
+                    <div class="total-line">
+                        <span>Total a Cancelar:</span>
+                        <span id="lbl-total-to-pay">0.00 Bs</span>
+                    </div>
+                    <div class="total-line">
+                        <span>Total Abonado:</span>
+                        <span id="lbl-total-paid">0.00 Bs</span>
+                    </div>
+                    <div class="total-line text-red-600" id="lbl-pending-box" style="color:var(--danger)">
+                        <span>Pendiente:</span>
+                        <span id="lbl-pending">0.00 Bs</span>
+                    </div>
+                    <div class="total-final" style="margin-top:5px; border-top:1px solid #ccc; padding-top:5px;">
+                        <span>Total Pagado:</span>
+                        <span id="lbl-final-total">0.00 Bs</span>
+                    </div>
+                </div>
+
+                <!-- Vuelto (Cambio) -->
+                <div id="change-container" class="hidden">
+                    <div class="change-box">
+                        <p><strong>Cambio a devolver:</strong></p>
+                        <p id="lbl-change-bs">0.00 Bs</p>
+                        <p id="lbl-change-usd">0.00 $</p>
+                    </div>
+                    <div class="mt-2">
+                        <label class="input-label text-sm">¿Cómo entregaste el cambio?</label>
+                        <select id="change-method" class="input-field">
+                            <option value="efectivo_bs">Efectivo Bs</option>
+                            <option value="efectivo_usd">Efectivo Dólares</option>
+                            <option value="punto">Pago Móvil</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="mt-4 flex gap-2">
+                    <button onclick="clearCart()" class="btn btn-secondary"
+                        style="background:#fee2e2; color:#991b1b;">Limpiar</button>
+                    <button onclick="processOrder()" class="btn btn-success">Procesar Orden</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODAL APERTURA DE CAJA === -->
+    <div id="modal-open-cash" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">Apertura de Caja</span>
+                <button class="close-modal" onclick="closeModal('modal-open-cash')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-4 text-sm text-gray-600">Registra cuánto dinero tienes al iniciar el turno.</p>
+
+                <div class="input-group">
+                    <label class="input-label">Efectivo Bs (Inicial)</label>
+                    <input type="number" id="open-cash-bs" class="input-field" placeholder="0.00">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Divisa $ (Inicial)</label>
+                    <input type="number" id="open-cash-usd" class="input-field" placeholder="0.00">
+                </div>
+
+                <button onclick="confirmOpenShift()" class="btn btn-success">Aperturar Caja</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODAL CIERRE DE CAJA === -->
+    <div id="modal-close-cash" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">Cierre de Turno</span>
+                <button class="close-modal" onclick="closeModal('modal-close-cash')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-4 text-center text-red-600 font-bold">¿Cerrar el ciclo actual?</p>
+                <p class="text-sm text-gray-600 mb-4">Esto reiniciará el contador de tickets y guardará un reporte del
+                    día.</p>
+
+                <!-- Resumen del cierre -->
+                <div class="p-3 bg-gray-100 rounded mb-4">
+                    <p>Ventas Totales: <span id="close-summary-sales" class="font-bold"></span></p>
+                    <p>Total Facturado: <span id="close-summary-total" class="font-bold"></span></p>
+                </div>
+
+                <button onclick="confirmCloseShift()" class="btn btn-danger w-full">Confirmar Cierre</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODAL GASTOS (ACTUALIZADO) === -->
+<div id="modal-expense" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <span class="modal-title">Registrar Gasto</span>
+            <button class="close-modal" onclick="closeModal('modal-expense')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="input-group">
+                <label class="input-label">Concepto (Ej: Compra Insumos)</label>
+                <input type="text" id="exp-concept" class="input-field" placeholder="Razón del gasto">
+            </div>
+            
+            <div class="flex gap-2">
+                <div class="input-group w-full">
+                    <label class="input-label">Moneda</label>
+                    <!-- AGREGADO onchange Y style="direction: ltr" -->
+                    <select id="exp-currency" class="input-field" style="direction: ltr;" onchange="updateExpAccounts()">
+                        <option value="bs">Bolívares (Bs)</option>
+                        <option value="usd">Dólares ($)</option>
+                        <option value="usdt">USDT</option>
+                    </select>
+                </div>
+                <div class="input-group w-full">
+                    <label class="input-label">Monto</label>
+                    <!-- AGREGADO style="direction: ltr" -->
+                    <input type="number" id="exp-amount" class="input-field" placeholder="0.00" style="direction: ltr;">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="input-label">Cuenta a debitar</label>
+                <select id="exp-account" class="input-field">
+                    <!-- Se llena dinámicamente con JS -->
+                </select>
+            </div>
+
+            <button onclick="saveExpense()" class="btn btn-danger w-full">Registrar Gasto</button>
+        </div>
+    </div>
+</div>
+
+<!-- === MODAL TRANSFERENCIA (ACTUALIZADO) === -->
+<div id="modal-transfer" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <span class="modal-title">Transferencia</span>
+            <button class="close-modal" onclick="closeModal('modal-transfer')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="flex gap-2">
+                <div class="input-group w-full">
+                    <label class="input-label">De:</label>
+                    <select id="trans-from" class="input-field">
+                        <option value="cashBs">Efectivo Bs</option>
+                        <option value="bank">Banco (Bs)</option>
+                    </select>
+                </div>
+                <div class="input-group w-full">
+                    <label class="input-label">Para:</label>
+                    <select id="trans-to" class="input-field">
+                        <option value="usdt">USDT (Binance)</option>
+                        <option value="bank">Banco (Bs)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="input-group">
+                <label class="input-label">Monto a Mover</label>
+                <input type="number" id="trans-amount" class="input-field" placeholder="0.00">
+            </div>
+            <p id="trans-hint" class="text-xs text-gray-500 mb-2">Se usará la Tasa Binance (${db.config.rateBinance}) si es a USDT.</p>
+            <button onclick="saveTransfer()" class="btn btn-primary w-full">Procesar Transferencia</button>
+        </div>
+    </div>
+</div>
+
+<!-- === MODAL GESTIÓN CATEGORÍAS === -->
+<div id="modal-category" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-header">
+            <span class="modal-title" id="cat-modal-title">Categoría</span>
+            <button class="close-modal" onclick="closeModal('modal-category')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="cat-id">
+            <div class="input-group">
+                <label class="input-label">Nombre</label>
+                <input type="text" id="cat-name" class="input-field" placeholder="Ej: Postres">
+            </div>
+            <div class="input-group">
+                <label class="input-label">Emoji (Icono)</label>
+                <input type="text" id="cat-icon" class="input-field" placeholder="Ej: 🍦">
+            </div>
+            <button onclick="saveCategory()" class="btn btn-success w-full">Guardar Categoría</button>
+        </div>
+    </div>
+</div>
+
+<a id="csv-download" href="#" style="display:none;">Descargar</a>
+
+    <!-- === TOASTS & PRINT === -->
+    <div id="toast-container"></div>
+    <div id="print-area" class="hidden"></div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
