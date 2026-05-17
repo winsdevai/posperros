@@ -1139,7 +1139,7 @@ function renderCartItems() {
                 <div class="cart-item-detail"> $${unitPriceUsd} c/u | ${totalItemBs} Bs ${item.note ? '| ' + item.note : ''}</div>
             </div>
             
-            <div class="cart-remove-btn" onclick="confirmRemoveItem(${index})">&times;</div>
+            <div class="cart-remove-btn" onclick="removeCartItem(${index})">&times;</div>
         `;
         container.appendChild(row);
     });
