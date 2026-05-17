@@ -30,6 +30,19 @@
             <!-- Contenedor Productos (Oculto al inicio) -->
             <div id="product-container" class="product-grid hidden" style="padding-top:1rem;"></div>
         </main>
+
+        <div id="goal-bar-container"
+            style="position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; padding: 5px 10px; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); z-index: 40; display: none;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;">
+                <span id="goal-text">Meta del día</span>
+                <span id="goal-percent">0%</span>
+            </div>
+            <div style="width: 100%; height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden;">
+                <div id="goal-progress-fill"
+                    style="width: 0%; height: 100%; background: var(--primary); transition: width 0.5s, background 0.3s;">
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- === VISTA ADMIN === -->
@@ -38,8 +51,9 @@
         <nav class="admin-sidebar" id="sidebar">
             <div class="p-4 text-center font-bold">ADMIN PANEL</div>
             <div class="admin-nav-item" onclick="navTo('inicio')">🏠 Inicio</div>
-            <div class="admin-nav-item" onclick="navTo('rentabilidad')">📈 Rentabilidad</div>
+            <div class="admin-nav-item" onclick="navTo('rentabilidad')">📈 Contabilidad</div>
             <div class="admin-nav-item" onclick="navTo('reportes')">📑 Reportes</div>
+            <div class="admin-nav-item" onclick="navTo('metas')">🎯 Rentabilidad</div>
             <div class="admin-nav-item" onclick="navTo('productos')">🍔 Productos</div>
             <div class="admin-nav-item" onclick="navTo('configuracion')">⚙️ Configuración</div>
             <div class="mt-auto p-4">
@@ -120,10 +134,18 @@
                 <!-- Precio USD (Se elimina el Stock duplicado de aquí) -->
                 <div class="flex gap-2">
                     <div class="input-group w-full">
-                        <label class="input-label">Precio ($)</label>
+                        <label class="input-label">Precio Venta ($)</label>
                         <input type="number" id="new-prod-price-usd" class="input-field" placeholder="0.00">
                     </div>
                 </div>
+
+                <div class="flex gap-2">
+                    <div class="input-group w-full">
+                        <label class="input-label">Precio Compra ($)</label>
+                        <input type="number" id="new-prod-cost" class="input-field" placeholder="0.00" step="0.01">
+                    </div>
+                </div>
+
                 <!-- NUEVO: INPUT DE IMAGEN -->
                 <div class="input-group">
                     <label class="input-label">Link de Imagen</label>
@@ -207,8 +229,7 @@
                 <div class="mb-2 p-2 bg-gray-100 rounded flex items-center gap-2">
                     <input type="checkbox" id="full-pay-toggle" checked onchange="togglePayMode()"
                         class="w-5 h-5 cursor-pointer">
-                    <label for="full-pay-toggle" class="cursor-pointer font-bold select-none">Pago Completo (Un solo
-                        método)</label>
+                    <label for="full-pay-toggle" class="cursor-pointer font-bold select-none">Pago Completo.</label>
                 </div>
 
                 <!-- CONTENEDOR DE BOTONES (Pago Rápido - Visible por defecto) -->
@@ -223,30 +244,34 @@
                         class="btn-pay-mode btn btn-secondary w-full py-2">Punto de Venta</button>
                 </div>
 
-                                <!-- CONTENEDOR DE INPUTS (Diseño 2x2) -->
+                <!-- CONTENEDOR DE INPUTS (Diseño 2x2) -->
                 <div id="container-pay-inputs" class="hidden grid grid-cols-2 gap-3">
                     <!-- Arriba Izquierda -->
                     <div class="flex flex-col items-center p-2 border rounded bg-white">
                         <span class="text-2xl mb-1">💵 Efec. Bs</span>
-                        <input type="number" id="pay-efectivo" class="input-field w-full text-center" placeholder="0.00" oninput="calculateTotals()">
+                        <input type="number" id="pay-efectivo" class="input-field w-full text-center" placeholder="0.00"
+                            oninput="calculateTotals()">
                     </div>
 
                     <!-- Arriba Derecha -->
                     <div class="flex flex-col items-center p-2 border rounded bg-white">
                         <span class="text-2xl mb-1">💳 Punto</span>
-                        <input type="number" id="pay-punto" class="input-field w-full text-center" placeholder="0.00" oninput="calculateTotals()">
+                        <input type="number" id="pay-punto" class="input-field w-full text-center" placeholder="0.00"
+                            oninput="calculateTotals()">
                     </div>
 
                     <!-- Abajo Izquierda -->
                     <div class="flex flex-col items-center p-2 border rounded bg-white">
                         <span class="text-2xl mb-1">📱 P. Móvil</span>
-                        <input type="number" id="pay-pm" class="input-field w-full text-center" placeholder="0.00" oninput="calculateTotals()">
+                        <input type="number" id="pay-pm" class="input-field w-full text-center" placeholder="0.00"
+                            oninput="calculateTotals()">
                     </div>
 
                     <!-- Abajo Derecha -->
                     <div class="flex flex-col items-center p-2 border rounded bg-white">
                         <span class="text-2xl mb-1">💲 Divisa</span>
-                        <input type="number" id="pay-divisa" class="input-field w-full text-center" placeholder="0.00" oninput="calculateTotals()">
+                        <input type="number" id="pay-divisa" class="input-field w-full text-center" placeholder="0.00"
+                            oninput="calculateTotals()">
                     </div>
                 </div>
 
@@ -294,6 +319,14 @@
                 <div class="input-group">
                     <label class="input-label">Divisa $ (Inicial)</label>
                     <input type="number" id="open-cash-usd" class="input-field" placeholder="0.00">
+                </div>
+
+                <div class="input-group"
+                    style="background-color: #eff6ff; padding: 10px; border-radius: 8px; border: 1px solid #bfdbfe;">
+                    <!-- CAMBIO: Ahora dice ($) -->
+                    <label class="input-label" style="color: var(--primary); font-weight: bold;">🎯 Meta de Ganancia del
+                        Día ($)</label>
+                    <input type="number" id="open-cash-goal" class="input-field" placeholder="0.00" step="0.01">
                 </div>
 
                 <button onclick="confirmOpenShift()" class="btn btn-success">Aperturar Caja</button>
@@ -396,8 +429,6 @@
                     <label class="input-label">Monto a Mover</label>
                     <input type="number" id="trans-amount" class="input-field" placeholder="0.00">
                 </div>
-                <p id="trans-hint" class="text-xs text-gray-500 mb-2">Se usará la Tasa Binance
-                    (${db.config.rateBinance}) si es a USDT.</p>
                 <button onclick="saveTransfer()" class="btn btn-primary w-full">Procesar Transferencia</button>
             </div>
         </div>

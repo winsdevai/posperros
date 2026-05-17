@@ -1,8 +1,8 @@
 :root {
     --primary: #2563eb;
     --secondary: #1e40af;
-    --bg-body: #f3f4f6;
-    --bg-card: #ffffff;
+    --bg-body: #dbff77;
+    --bg-card: #ff763f;
     --text-main: #1f2937;
     --text-light: #6b7280;
     --danger: #ef4444;
@@ -40,7 +40,7 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
 }
 
 #logo-trigger {
-    font-size: 1.2rem; font-weight: 800; color: var(--primary);
+    font-size: 1.2rem; font-weight: 800; color: white; background-color: transparent;
     user-select: none; padding: 5px 10px; border-radius: 5px; border: 2px solid transparent;
 }
 #logo-trigger:active { background-color: #e5e7eb; }
@@ -528,4 +528,21 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
 /* Espacio para que el botón "Volver" no tape los productos */
 #product-container {
     padding-top: 60px !important;
+}
+
+/* === AGREGAR ESTO AL FINAL DEL CSS === */
+/* Barra de Meta */
+.goal-over {
+    background-color: #10b981 !important; /* Verde brillante para el extra */
+}
+
+/* Estilos para tabla de Metas */
+.metas-table th {
+    background: #f3f4f6;
+    padding: 8px;
+    text-align: left;
+}
+.metas-table td {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
 }

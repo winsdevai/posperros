@@ -22,12 +22,12 @@ const defaultDB = {
     products: [
         {
             id: 1, categoryId: 1, name: "Hamburguesa Clásica",
-            priceUsd: 1.50, stock: 50,
+            priceUsd: 1.50, purchasePrice: 0.50, stock: 50,
             image: "🍔", ingredients: ["Pan", "Carne", "Lechuga", "Tomate", "Queso"]
         },
         {
             id: 2, categoryId: 3, name: "Pepsi 500ml",
-            priceUsd: 0.80, stock: 100,
+            priceUsd: 0.80, purchasePrice: 0.30, stock: 100,
             image: "🥤", ingredients: []
         }
     ],
@@ -45,12 +45,13 @@ const defaultDB = {
         openingAmountBs: 0,
         openingAmountUsd: 0,
         payments: { efectivo: 0, pago_movil: 0, punto: 0, divisa: 0 },
-        // SEPARAMOS EL CAMBIO EN 3 VARIABLES
         changeGivenBs: 0,
         changeGivenUsd: 0,
         changeGivenDigital: 0,
         salesCount: 0,
-        totalSoldBs: 0
+        totalSoldBs: 0,
+        dailyGoal: 0,
+        totalProfit: 0
     }
 
 };
@@ -85,10 +86,23 @@ function sanitizeDB() {
             changeGivenUsd: 0,
             changeGivenDigital: 0,
             salesCount: 0,
-            totalSoldBs: 0
+            totalSoldBs: 0,
+            dailyGoal: 0,
+            totalProfit: 0
         };
         needsSave = true;
+    } else {
+        if (db.currentShift.dailyGoal === undefined) { db.currentShift.dailyGoal = 0; needsSave = true; }
+        if (db.currentShift.totalProfit === undefined) { db.currentShift.totalProfit = 0; needsSave = true; }
     }
+
+    db.products.forEach(p => {
+        if (typeof p.purchasePrice === 'undefined') {
+            p.purchasePrice = 0;
+            needsSave = true;
+        }
+    });
+
     // Migración para usuarios que tengan la version vieja
     if (db.currentShift.totalChangeBs !== undefined && !db.currentShift.changeGivenBs) {
         db.currentShift.changeGivenBs = db.currentShift.totalChangeBs;
@@ -390,7 +404,7 @@ const triggerAdmin = () => {
 // 1. Al tocar la pantalla (Touch Start)
 logoTrigger.addEventListener('touchstart', (e) => {
     // Evitamos que salga el menú de copiar/pegar del celular
-    e.preventDefault(); 
+    e.preventDefault();
     // Iniciamos el temporizador de 800ms
     pressTimer = setTimeout(triggerAdmin, 800);
 }, { passive: false }); // passive: false es necesario para usar preventDefault
@@ -807,6 +821,71 @@ function navTo(section) {
                 </table>
             </div>
         `;
+        } else if (section === 'metas') {
+        const closings = db.history.filter(h => h.type === 'closing' && h.dailyGoal !== undefined);
+
+        let rows = closings.map(c => {
+            const dateObj = new Date(c.date);
+            const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            const dayName = days[dateObj.getDay()];
+
+            const grossUsd = c.totals.usd || 0; 
+            const netProfitUsd = c.totalProfit || 0;
+
+            // === NUEVA FÓRMULA ===
+            const diff = netProfitUsd - c.dailyGoal;
+            
+            // Lógica de Colores:
+            // Si es < 0 (Negativo): ROJO (Faltó dinero / Deuda)
+            // Si es > 0 (Positivo): VERDE (Sobró dinero / Ganancia extra)
+            let diffColor = 'color: gray;'; // Neutro si es 0
+            let diffPrefix = "";
+
+            if (diff < 0) {
+                diffColor = 'color: var(--danger); font-weight:bold;'; // Rojo
+                diffPrefix = "-$"; // Visualización opcional
+            } else if (diff > 0) {
+                diffColor = 'color: var(--success); font-weight:bold;'; // Verde
+                diffPrefix = "+$";
+            }
+            // =====================
+
+            return `
+                <tr>
+                    <td>${dayName}</td>
+                    <td>${c.dateStr.split(',')[0]}</td>
+                    <td>${c.salesCount || 0}</td>
+                    <td>$${grossUsd.toFixed(2)}</td>
+                    <td style="color: ${netProfitUsd >= 0 ? 'green' : 'red'}">$${netProfitUsd.toFixed(2)}</td>
+                    <td>$${c.dailyGoal.toFixed(2)}</td>
+                    <td style="${diffColor}">$${diff.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        if (rows === '') rows = '<tr><td colspan="7" class="text-center">No hay datos de metas previas (cierra caja para generar).</td></tr>';
+
+        content = `
+            <h2 class="mb-4">Reporte de Rentabilidad</h2>
+            <button onclick="downloadGoalsCSV()" class="btn btn-success mb-4">📥 Descargar CSV Metas</button>
+            
+            <div style="overflow-x:auto;">
+                <table class="admin-table metas-table">
+                    <thead>
+                        <tr>
+                            <th>Día</th>
+                            <th>Fecha</th>
+                            <th># Ventas</th>
+                            <th>Ingreso total</th>
+                            <th>Margen Bruto</th>
+                            <th>Gastos Fijos</th>
+                            <th>Utilidad Final</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
     } else if (section === 'configuracion') {
         // === CONFIGURACIÓN ACTUALIZADA CON CATEGORÍAS ===
         const catRows = db.categories.map(c => `
@@ -953,6 +1032,7 @@ function openCreateModal() {
     document.getElementById('edit-prod-id').value = "";
     document.getElementById('new-prod-name').value = "";
     document.getElementById('new-prod-price-usd').value = "";
+    document.getElementById('new-prod-cost').value = "";
     document.getElementById('new-prod-ings').value = "";
 
     // --- RESET DE STOCK AL CREAR ---
@@ -972,6 +1052,7 @@ function editProduct(id) {
     document.getElementById('new-prod-name').value = p.name;
     document.getElementById('new-prod-cat').value = p.categoryId;
     document.getElementById('new-prod-price-usd').value = p.priceUsd;
+    document.getElementById('new-prod-cost').value = p.purchasePrice || 0;
     document.getElementById('new-prod-ings').value = p.ingredients ? p.ingredients.join(', ') : "";
 
     // --- LÓGICA DE STOCK AL EDITAR ---
@@ -998,6 +1079,7 @@ function saveProduct() {
     const name = document.getElementById('new-prod-name').value;
     const catId = parseInt(document.getElementById('new-prod-cat').value);
     const priceUsd = parseFloat(document.getElementById('new-prod-price-usd').value);
+    const purchasePrice = parseFloat(document.getElementById('new-prod-cost').value) || 0;
     const ingsStr = document.getElementById('new-prod-ings').value;
     const ingredients = ingsStr ? ingsStr.split(',').map(s => s.trim()) : [];
     const prodImg = document.getElementById('new-prod-img').value;
@@ -1034,7 +1116,8 @@ function saveProduct() {
                 name, categoryId: catId, priceUsd,
                 stock: finalStock,
                 ingredients,
-                image: prodImg || db.products[index].image // <--- GUARDAR IMAGEN (o mantener la vieja si está vacío)
+                image: prodImg || db.products[index].image,
+                purchasePrice: purchasePrice
             };
             showToast("Producto y Stock actualizados");
         }
@@ -1051,7 +1134,8 @@ function saveProduct() {
             priceUsd: priceUsd,
             stock: stockInputVal, // Valor absoluto inicial
             image: prodImg || '🍽️',
-            ingredients: ingredients
+            ingredients: ingredients,
+            purchasePrice: purchasePrice
         };
         db.products.push(newProd);
         showToast("Producto creado");
@@ -1139,7 +1223,7 @@ function renderCartItems() {
                 <div class="cart-item-detail"> $${unitPriceUsd} c/u | ${totalItemBs} Bs ${item.note ? '| ' + item.note : ''}</div>
             </div>
             
-            <div class="cart-remove-btn" onclick="removeCartItem(${index})">&times;</div>
+            <div class="cart-remove-btn" onclick="confirmRemoveItem(${index})">&times;</div>
         `;
         container.appendChild(row);
     });
@@ -1244,6 +1328,19 @@ function processOrder() {
         totalSaleBs += (itemPriceBs * item.qty);
     });
 
+    let orderProfitUsd = 0;
+    db.cart.forEach(item => {
+        const prod = db.products.find(p => p.id === item.productId);
+        if (prod) {
+            // Ganancia unitaria en USD = (Precio Venta - Precio Compra)
+            // Ya no multiplicamos por la tasa, queremos el valor puro en USD
+            const unitProfitUsd = (prod.priceUsd - prod.purchasePrice);
+            orderProfitUsd += (unitProfitUsd * item.qty);
+        }
+    });
+
+    db.currentShift.totalProfit += orderProfitUsd;
+
     // 2. Leer Pagos
     const effBs = parseFloat(document.getElementById('pay-efectivo').value) || 0;
     const pmBs = parseFloat(document.getElementById('pay-pm').value) || 0;
@@ -1320,6 +1417,7 @@ function processOrder() {
         updateCartBadge();
         closeModal('modal-cart');
         renderCategories();
+        updateProgressBar();
     }, 1500);
 }
 
@@ -1474,10 +1572,13 @@ function confirmRemoveItem(index) {
 function confirmOpenShift() {
     const bs = parseFloat(document.getElementById('open-cash-bs').value) || 0;
     const usd = parseFloat(document.getElementById('open-cash-usd').value) || 0;
+    const goal = parseFloat(document.getElementById('open-cash-goal').value) || 0;
 
     db.currentShift.isOpen = true;
     db.currentShift.openingAmountBs = bs;
     db.currentShift.openingAmountUsd = usd;
+    db.currentShift.dailyGoal = goal;
+    db.currentShift.totalProfit = 0;
 
     // IMPORTANTE: NO modificamos db.balance. La apertura es solo dinero interno del cajón.
 
@@ -1496,6 +1597,8 @@ function confirmOpenShift() {
     saveDB();
     closeModal('modal-open-cash');
     navTo('inicio');
+    renderCategories();
+    updateProgressBar();
     showToast("Caja Aperturada Correctamente");
 }
 
@@ -1516,7 +1619,10 @@ function confirmCloseShift() {
         dateStr: "Cierre de Turno - " + new Date().toLocaleString(),
         totals: { bs: shift.totalSoldBs, usd: shift.totalSoldBs / db.config.rateUsd },
         items: [],
-        payments: shift.payments
+        payments: shift.payments,
+        dailyGoal: shift.dailyGoal,
+        totalProfit: shift.totalProfit,
+        salesCount: shift.salesCount
     });
 
     // 2. Mover todas las ventas activas al historial
@@ -1546,7 +1652,9 @@ function confirmCloseShift() {
         changeGivenUsd: 0,
         changeGivenDigital: 0,
         salesCount: 0,
-        totalSoldBs: 0
+        totalSoldBs: 0,
+        dailyGoal: 0,
+        totalProfit: 0
     };
 
     // 5. Reiniciar tickets
@@ -1869,7 +1977,7 @@ function downloadCSV() {
     const url = URL.createObjectURL(blob);
 
     link.setAttribute('href', url);
-    link.setAttribute('download', `Reporte_Mensual_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `Detallado_De_Transaacciones_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2285,4 +2393,79 @@ function installApp() {
     } else {
         showToast("O ya está instalado o tu navegador no soporta la instalación rápida.");
     }
+}
+
+function updateProgressBar() {
+    const container = document.getElementById('goal-bar-container');
+    const fill = document.getElementById('goal-progress-fill');
+    const text = document.getElementById('goal-text');
+    const percentSpan = document.getElementById('goal-percent');
+
+    const shift = db.currentShift;
+
+    if (shift.isOpen && shift.dailyGoal > 0) {
+        container.style.display = 'block';
+
+         let percent = (shift.totalProfit / shift.dailyGoal) * 100;
+        if (percent < 0) percent = 0; 
+
+        fill.style.width = percent + "%";
+        percentSpan.innerText = percent.toFixed(1) + "%";
+
+        text.innerText = `Ganancia: $${shift.totalProfit.toFixed(2)} / Meta: $${shift.dailyGoal.toFixed(2)}`;
+
+        // Cambiar color si pasa del 100%
+        if (percent >= 100) {
+            fill.classList.add('goal-over');
+        } else {
+            fill.classList.remove('goal-over');
+        }
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+function downloadGoalsCSV() {
+    const closings = db.history.filter(h => h.type === 'closing' && h.dailyGoal !== undefined);
+    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+    // Cambié el encabezado para que se entienda la nueva lógica
+    let csv = "Dia,Fecha,# Ventas,Ingreso Total,Margen Bruto,Gastos Fijos,Utilidad Final\n";
+
+    let totalGoal = 0;
+    let totalGross = 0;
+    let totalNet = 0;
+
+    closings.forEach(c => {
+        const dateObj = new Date(c.date);
+        const dayName = days[dateObj.getDay()];
+        const dateStr = dateObj.toLocaleDateString();
+        
+        const grossUsd = c.totals.usd || 0;
+        const netProfitUsd = c.totalProfit || 0;
+        const count = c.salesCount || 0;
+
+        // === NUEVA FÓRMULA: Ganancia - Meta ===
+        // Si Ganancia < Meta -> Resultado NEGATIVO (Deuda/Faltante)
+        // Si Ganancia > Meta -> Resultado POSITIVO (Extra/Sobrante)
+        const diff = netProfitUsd - c.dailyGoal; 
+        // ========================================
+
+        totalGoal += c.dailyGoal;
+        totalGross += grossUsd;
+        totalNet += netProfitUsd;
+
+        csv += `${dayName},${dateStr},${count},${grossUsd.toFixed(2)},${netProfitUsd.toFixed(2)},${c.dailyGoal.toFixed(2)},${diff.toFixed(2)}\n`;
+    });
+
+    // El total se calcula solo sumando las diferencias correctas
+    const totalDiff = totalNet - totalGoal;
+
+    csv += `TOTAL,,,${totalGross.toFixed(2)},${totalNet.toFixed(2)},${totalGoal.toFixed(2)},${totalDiff.toFixed(2)}\n`;
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.getElementById('csv-download');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Reporte_Rentabilidad_USD_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
 }
