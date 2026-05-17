@@ -878,12 +878,14 @@ function navTo(section) {
                 </div>
             </div>
 
-            <!-- DENTRO de navTo('configuracion'), donde quieras que aparezca el botón -->
             <div class="bg-blue-50 p-4 rounded shadow border border-blue-200 mt-4">
                 <h3 class="font-bold text-blue-800 mb-2">Cierre de Mes</h3>
                 <p class="text-sm text-blue-600 mb-2">Descarga el reporte actual y borra el historial para empezar el mes nuevo. El dinero actual se guardará.</p>
                 <button onclick="closeMonthAndReset()" class="btn btn-primary w-full">📅 Cerrar Mes y Reiniciar</button>
+                <button onclick="installApp()" class="btn btn-primary">📲 Instalar App</button>
             </div>
+
+            
 
             <!-- Zona de Peligro -->
             <div class="bg-red-50 p-4 rounded shadow border border-red-200 mt-4">
@@ -2260,4 +2262,27 @@ function saveManualSale() {
     closeModal('modal-manual-sale');
     showToast("Venta Manual Registrada Correctamente");
     navTo('inicio'); // Refrescar la pantalla para ver el nuevo dinero
+}
+
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Previene que el navegador muestre el banner automático (para controlarlo tú)
+    e.preventDefault();
+    // Guarda el evento para dispararlo después
+    deferredPrompt = e;
+});
+
+// Función para llamarla desde un botón en Configuración
+function installApp() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('Usuario aceptó instalar');
+            }
+            deferredPrompt = null;
+        });
+    } else {
+        showToast("O ya está instalado o tu navegador no soporta la instalación rápida.");
+    }
 }
