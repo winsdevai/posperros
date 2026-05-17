@@ -502,6 +502,9 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
    UTILIDADES FALTANTES (PARA EL GRID DE PAGOS)
    ========================================== */
 
+.mt-5 { margin-top: 1.25rem; }
+.mb-4 { margin-bottom: 1rem; }
+
 /* Para que funcione la cuadrícula */
 .grid {
     display: grid;
@@ -520,4 +523,9 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
 /* Dirección columna (para alinear emoji arriba e input abajo) */
 .flex-col {
     flex-direction: column;
+}
+
+/* Espacio para que el botón "Volver" no tape los productos */
+#product-container {
+    padding-top: 60px !important;
 }

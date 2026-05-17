@@ -14,7 +14,7 @@
     <!-- === VISTA POS === -->
     <div id="pos-view">
         <header id="pos-header" class="flex items-center justify-between">
-            <div id="logo-trigger" class="cursor-pointer">🍔 MI POS</div>
+            <div id="logo-trigger" class="cursor-pointer">🍔 POS VENTA</div>
             <div class="cart-icon" onclick="abrirCarrito()">
                 🛒 <span id="cart-count" class="cart-badge">0</span>
             </div>
@@ -68,7 +68,7 @@
     <div id="modal-product" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
-                <span class="modal-title">Personalizar Pedido</span>
+                <span class="modal-title">Pedido</span>
                 <button class="close-modal" onclick="closeModal('modal-product')">&times;</button>
             </div>
             <div class="modal-body text-center">
@@ -268,7 +268,7 @@
                 </div>
 
                 <!-- Botones de Acción -->
-                <div class="mt-4 flex gap-2">
+                <div class="mt-5 flex gap-2">
                     <button onclick="clearCart()" class="btn btn-secondary"
                         style="background:#fee2e2; color:#991b1b;">Limpiar</button>
                     <button onclick="processOrder()" class="btn btn-success">Procesar Orden</button>
