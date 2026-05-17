@@ -10,7 +10,9 @@ const defaultDB = {
         rateUsd: 600,
         rateBinance: 600,
         initialCapitalBs: 0,
-        initialCapitalUsd: 0
+        initialCapitalUsd: 0,
+        initialCapitalUsdt: 0,
+        initialCapitalBank: 0
     },
     categories: [
         { id: 1, name: "Hamburguesas", icon: "🍔" },
@@ -66,6 +68,8 @@ function sanitizeDB() {
     // Comprobar tasas
     if (!db.config.initialCapitalBs) db.config.initialCapitalBs = 0;
     if (!db.config.initialCapitalUsd) db.config.initialCapitalUsd = 0;
+    if (!db.config.initialCapitalUsdt) { db.config.initialCapitalUsdt = 0; needsSave = true; }
+    if (!db.config.initialCapitalBank) { db.config.initialCapitalBank = 0; needsSave = true; }
     if (!db.config.rateUsd || db.config.rateUsd === 0) { db.config.rateUsd = 600; needsSave = true; }
     if (!db.config.rateBinance) { db.config.rateBinance = 600; needsSave = true; }
     if (!db.sales) { db.sales = []; needsSave = true; }
@@ -139,10 +143,25 @@ function renderCategories() {
     db.categories.forEach(cat => {
         const card = document.createElement('div');
         card.className = 'product-card';
-        // Estilo más grande para categoría
         card.style.minHeight = '120px';
+
+        // --- LÓGICA AUTOMÁTICA DE IMAGEN VS EMOJI ---
+        let iconDisplay = cat.icon;
+
+        // Si el texto empieza con http o https, lo convertimos en etiqueta <img>
+        if (cat.icon && (cat.icon.startsWith('http') || cat.icon.startsWith('https'))) {
+            iconDisplay = `<img src="${cat.icon}" style="width:60px; height:60px; object-fit:contain;">`;
+        } else if (cat.icon && cat.icon.startsWith('<img>')) {
+            // Si ya pegaron una etiqueta img completa, la usamos tal cual
+            iconDisplay = cat.icon;
+        }
+        // Si no es ninguna de las anteriores, deja el texto (emoji) tal cual.
+        // ---------------------------------------------------------------
+
         card.innerHTML = `
-            <div class="product-img-placeholder" style="height: 80px; font-size: 2.5rem;">${cat.icon}</div>
+            <div class="product-img-placeholder" style="height: 80px; font-size: 2.5rem; display:flex; align-items:center; justify-content:center;">
+                ${iconDisplay}
+            </div>
             <div class="product-info">
                 <div class="font-bold text-lg">${cat.name}</div>
             </div>
@@ -173,7 +192,10 @@ function openCategory(catId) {
 
     filtered.forEach(p => {
         const priceBs = (p.priceUsd * db.config.rateUsd).toFixed(0);
-
+        let imgDisplay = p.image || '🍽️';
+        if (p.image && (p.image.startsWith('http') || p.image.startsWith('<img>'))) {
+            imgDisplay = `<img src="${p.image}" style="width:100%; height:100%; object-fit:cover; border-radius:8px;">`;
+        }
         const card = document.createElement('div');
         card.className = 'product-card';
         card.onclick = () => openProductModal(p.id);
@@ -182,7 +204,7 @@ function openCategory(catId) {
         const stockClass = p.stock <= 0 ? 'opacity-50 grayscale' : '';
 
         card.innerHTML = `
-            <div class="product-img-placeholder ${stockClass}">${p.image || '🍽️'}</div>
+            <div class="product-img-placeholder ${stockClass}" style="padding:0; overflow:hidden;">${imgDisplay}</div>
             <div class="product-info">
                 <div class="font-bold text-sm">${p.name}</div>
                 <div class="price-tag">$${p.priceUsd}</div>
@@ -201,6 +223,14 @@ let currentIngredients = {};
 let currentQuantity = 1;
 
 function openProductModal(productId) {
+    // --- BLOQUEO DE SEGURIDAD ---
+    if (!db.currentShift.isOpen) {
+        showToast("⚠️ Caja Cerrada. Abra turno para vender.");
+        openModal('modal-open-cash');
+        return;
+    }
+    // --- FIN BLOQUEO ---
+
     currentProduct = db.products.find(p => p.id === productId);
     if (!currentProduct) return;
 
@@ -312,6 +342,15 @@ function updateCartBadge() {
 }
 
 function abrirCarrito() {
+
+    // --- BLOQUEO DE SEGURIDAD ---
+    if (!db.currentShift.isOpen) {
+        showToast("⚠️ Debe APERTURAR CAJA antes de vender");
+        openModal('modal-open-cash'); // Abrimos el modal para abrir caja automáticamente
+        return;
+    }
+    // --- FIN BLOQUEO ---
+
     if (db.cart.length === 0) {
         showToast("El carrito está vacío");
         return;
@@ -325,6 +364,12 @@ function abrirCarrito() {
     document.getElementById('pay-punto').value = '';
     document.getElementById('pay-divisa').value = '';
 
+    document.getElementById('full-pay-toggle').checked = true;
+    togglePayMode(); // Esto oculta los inputs y muestra los botones
+
+    // 3. Quitar clase 'active' de todos los botones rápidos
+    document.querySelectorAll('.btn-pay-mode').forEach(b => b.classList.remove('active'));
+
     document.getElementById('change-container').classList.add('hidden');
     openModal('modal-cart');
     calculateTotals();
@@ -334,16 +379,52 @@ function abrirCarrito() {
 // SEGURIDAD Y LOGIN (Mismo que antes)
 // ==========================================
 document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key.toLowerCase() === 'd') { e.preventDefault(); openAdminLogin(); } });
+// --- MANEJO ROBUSTO DE PRESIONAR LOGO (LONG PRESS) ---
 let pressTimer;
-logoTrigger.addEventListener('mousedown', () => pressTimer = setTimeout(openAdminLogin, 800));
-logoTrigger.addEventListener('touchstart', () => pressTimer = setTimeout(openAdminLogin, 800));
-['mouseup', 'mouseleave', 'touchend'].forEach(ev => logoTrigger.addEventListener(ev, () => clearTimeout(pressTimer)));
+
+// Función para abrir login
+const triggerAdmin = () => {
+    openAdminLogin();
+};
+
+// 1. Al tocar la pantalla (Touch Start)
+logoTrigger.addEventListener('touchstart', (e) => {
+    // Evitamos que salga el menú de copiar/pegar del celular
+    e.preventDefault(); 
+    // Iniciamos el temporizador de 800ms
+    pressTimer = setTimeout(triggerAdmin, 800);
+}, { passive: false }); // passive: false es necesario para usar preventDefault
+
+// 2. Al levantar el dedo (Touch End)
+logoTrigger.addEventListener('touchend', () => {
+    // Si levantaron el dedo antes de 800ms, cancelamos
+    clearTimeout(pressTimer);
+});
+
+// 3. Si mueven el dedo (Touch Move) - Cancelamos por si arrastraron sin querer
+logoTrigger.addEventListener('touchmove', () => {
+    clearTimeout(pressTimer);
+});
+
+// 4. Soporte para Mouse (por si lo usas en PC)
+logoTrigger.addEventListener('mousedown', () => {
+    pressTimer = setTimeout(triggerAdmin, 800);
+});
+
+logoTrigger.addEventListener('mouseup', () => {
+    clearTimeout(pressTimer);
+});
+
+logoTrigger.addEventListener('mouseleave', () => {
+    clearTimeout(pressTimer);
+});
 
 function openAdminLogin() {
     document.getElementById('admin-pin').value = '';
     document.getElementById('login-modal').classList.remove('hidden');
     setTimeout(() => document.getElementById('admin-pin').focus(), 100);
 }
+
 document.getElementById('close-login').onclick = () => document.getElementById('login-modal').classList.add('hidden');
 document.getElementById('admin-pin').addEventListener('keypress', (e) => { if (e.key === 'Enter') verifyPin() });
 document.getElementById('btn-verify-pin').onclick = verifyPin;
@@ -447,6 +528,7 @@ function navTo(section) {
             htmlActions = `
                 <div class="action-btns">
                     <button onclick="prepareCloseShift()" class="btn btn-danger btn-wide">🔒 Cerrar Caja</button>
+                    <button onclick="openModal('modal-manual-sale')" class="btn btn-secondary btn-wide">💰 Registrar Caja Extra</button>
                 </div>
             `;
         }
@@ -534,13 +616,23 @@ function navTo(section) {
     } else if (section === 'productos') {
         content = renderAdminProductsHTML();
     } else if (section === 'rentabilidad') {
-        // 1. Cálculo del Saldo VISUAL (Basado en Capital Inicial + Ventas Activas)
+
+        // 1. Cálculo del Saldo VISUAL CORREGIDO (Historial + Turno Actual)
         const shift = db.currentShift;
 
+        // EFECTIVO BS = Capital Inicial + Acumulado Histórico + Ventas Turno - Cambio Turno
         const currentCashBs = db.config.initialCapitalBs + db.balance.cashBs + shift.payments.efectivo - shift.changeGivenBs;
+
+        // EFECTIVO USD = Capital Inicial + Acumulado Histórico + Ventas Turno - Cambio Turno
         const currentCashUsd = db.config.initialCapitalUsd + db.balance.cashUsd + shift.payments.divisa - shift.changeGivenUsd;
-        const currentBank = shift.payments.punto + shift.payments.pago_movil - shift.changeGivenDigital;
-        const currentUsdt = db.balance.usdt; // USDT siempre maneja su propio historial
+
+        // BANCO = Acumulado Histórico (Aquí está la clave para errores 1, 2, 3)
+        // Se suma el banco histórico + lo del turno actual
+        // BANCO = Capital Inicial + Acumulado Histórico + Turno Actual
+        const currentBank = (db.config.initialCapitalBank || 0) + db.balance.bank + shift.payments.punto + shift.payments.pago_movil - shift.changeGivenDigital;
+
+        // USDT = Capital Inicial + Acumulado Histórico
+        const currentUsdt = (db.config.initialCapitalUsdt || 0) + db.balance.usdt;
 
 
         const contentBalance = `
@@ -906,6 +998,7 @@ function saveProduct() {
     const priceUsd = parseFloat(document.getElementById('new-prod-price-usd').value);
     const ingsStr = document.getElementById('new-prod-ings').value;
     const ingredients = ingsStr ? ingsStr.split(',').map(s => s.trim()) : [];
+    const prodImg = document.getElementById('new-prod-img').value;
 
     // Input de Stock
     const stockInputStr = document.getElementById('new-prod-stock').value;
@@ -938,7 +1031,8 @@ function saveProduct() {
                 ...db.products[index],
                 name, categoryId: catId, priceUsd,
                 stock: finalStock,
-                ingredients
+                ingredients,
+                image: prodImg || db.products[index].image // <--- GUARDAR IMAGEN (o mantener la vieja si está vacío)
             };
             showToast("Producto y Stock actualizados");
         }
@@ -954,7 +1048,7 @@ function saveProduct() {
             name: name,
             priceUsd: priceUsd,
             stock: stockInputVal, // Valor absoluto inicial
-            image: '🍽️',
+            image: prodImg || '🍽️',
             ingredients: ingredients
         };
         db.products.push(newProd);
@@ -1176,6 +1270,7 @@ function processOrder() {
         ticketNumber: ticketNumber,
         date: saleDate,
         dateStr: saleDate.toLocaleString(),
+        type: 'sale',
         items: [...db.cart],
         totals: { bs: totalSaleBs, usd: totalSaleBs / db.config.rateUsd },
         payments: { efectivo: effBs, pago_movil: pmBs, punto: puntoBs, divisa: divUsd },
@@ -1230,7 +1325,7 @@ function processOrder() {
 
 function printTicket(saleData) {
     const printArea = document.getElementById('print-area');
-    
+
     // --- CABECERA ---
     let html = `
         <div class="text-center bold" style="font-size: 16px; margin-bottom: 5px;">MI POS</div>
@@ -1246,7 +1341,7 @@ function printTicket(saleData) {
     saleData.items.forEach(item => {
         const totalBs = (item.priceBs * item.qty).toFixed(2);
         const unitUsd = item.priceUsd.toFixed(2);
-        
+
         html += `
             <div style="display: flex; justify-content: space-between; font-size: 12px;">
                 <span>${item.qty} x ${item.name}</span>
@@ -1273,10 +1368,10 @@ function printTicket(saleData) {
     `;
 
     // --- PIE DE PÁGINA ---
-    html += `<div class="text-center" style="font-size: 10px; margin-bottom: 5px;">¡Gracias por su compra!</div>`; 
+    html += `<div class="text-center" style="font-size: 10px; margin-bottom: 5px;">¡Gracias por su compra!</div>`;
     html += `<p style="text-align: center; margin: 5px 0;">////////////////////////</p>`;
     html += `<p style="text-align: center; margin: 5px 0;">////////////////////////</p>`;
-   
+
 
     // --- ESPACIO EN BLANCO AL FINAL (Para que no corte el texto) ---
     html += `<div class="print-spacer">Bienvenido a </div>`;
@@ -1582,8 +1677,11 @@ function saveExpense() {
     let amountUsdt = 0;
 
     if (currency === 'bs') {
-        db.balance.cashBs -= amount; // o db.balance.bank si selecciona banco
-        if (account === 'bank') db.balance.bank -= amount;
+        if (account === 'bank') {
+            db.balance.bank -= amount;
+        } else {
+            db.balance.cashBs -= amount;
+        }
         amountBs = amount;
     } else if (currency === 'usd') {
         db.balance.cashUsd -= amount;
@@ -1681,113 +1779,95 @@ function saveTransfer() {
 // --- FUNCIONES DE REPORTES Y CATEGORÍAS (FASE 7) ---
 
 function downloadCSV() {
-    const allRecords = db.sales.concat(db.history);
+    // 1. Unir registros
+    let allRecords = db.sales.concat(db.history);
 
-    // 1. Calcular Totales para el pie de página
-    let totalBank = 0;
-    let totalCashBs = 0;
-    let totalCashUsd = 0;
-    let totalUsdt = 0;
+    // 2. FILTRO GLOBAL: Eliminamos Ventas y Aperturas del archivo (Punto 1)
+    allRecords = allRecords.filter(r => r.type !== 'sale' && r.type !== 'opening');
 
-    allRecords.forEach(r => {
-        // Calcular montos por columna
-        let bank = 0;
-        let cashBs = 0;
-        let cashUsd = 0;
-        let usdt = 0;
+    // Diccionario de traducción (Punto 4)
+    const typeTranslations = {
+        'closing': 'Cierre',
+        'expense': 'Gasto',
+        'transfer': 'Transferencia'
+    };
 
-        if (r.payments) {
-            bank = (r.payments.pago_movil || 0) + (r.payments.punto || 0);
-            cashBs = (r.payments.efectivo || 0);
-            cashUsd = (r.payments.divisa || 0);
-        }
-        if (r.type === 'transfer' && r.totals && r.totals.usdt) {
-            usdt = r.totals.usdt;
-        }
-        // Gastos se restan (negativos)
-        if (r.type === 'expense') {
-            let amount = r.amount || (r.totals.bs); // Asumimos Bs por defecto si viene de viejos datos
-            if (r.currency === 'usd') { amount = amount / db.config.rateUsd; cashUsd = -amount; }
-            else if (r.currency === 'usdt') { usdt = -amount; }
-            else {
-                if (r.account === 'cashBs') cashBs = -amount;
-                if (r.account === 'bank') bank = -amount;
-            }
-        }
-
-        // Sumar a los totales globales
-        totalBank += bank;
-        totalCashBs += cashBs;
-        totalCashUsd += cashUsd;
-        totalUsdt += usdt;
-    });
-
-    // Sumar Capital Inicial a los totales del reporte final
-    totalCashBs += db.config.initialCapitalBs;
-    totalCashUsd += db.config.initialCapitalUsd;
-
-    // 2. Crear Cabecera CSV
+    // 3. Crear Cabecera CSV
     let csvContent = "Fecha,Hora,Tipo,Detalle,Banco (BS/Punto),Efec BS,Divisa $,USDT\n";
 
-    // 3. Generar Filas
+    // 4. Generar Filas
     allRecords.forEach(r => {
         const dateObj = new Date(r.date);
         const date = dateObj.toLocaleDateString();
         const time = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        let type = r.type || 'sale';
-        let detail = r.concept || (r.ticketNumber ? `Venta #${r.ticketNumber}` : '');
+        // Traducir tipo o usar el original si no está en la lista
+        let displayType = typeTranslations[r.type] || r.type;
+
+        let detail = r.concept || '';
 
         let bank = 0;
         let cashBs = 0;
         let cashUsd = 0;
         let usdt = 0;
 
-        if (r.payments) {
-            bank = (r.payments.pago_movil || 0) + (r.payments.punto || 0);
-            cashBs = (r.payments.efectivo || 0);
-            cashUsd = (r.payments.divisa || 0);
+        // --- LÓGICA DE COLUMNAS ---
+
+        if (r.type === 'closing') {
+            // Mostrar montos del cierre
+            if (r.payments) {
+                bank = (r.payments.pago_movil || 0) + (r.payments.punto || 0);
+                cashBs = (r.payments.efectivo || 0);
+                cashUsd = (r.payments.divisa || 0);
+            }
         }
-        if (r.type === 'transfer' && r.totals && r.totals.usdt) usdt = r.totals.usdt;
+        else if (r.type === 'transfer') {
+            // PUNTO 3: Arreglar lógica de transferencias para CSV
+            // Si hay información de USDT
+            if (r.totals && r.totals.usdt) usdt = r.totals.usdt;
 
-        if (r.type === 'expense') {
-            // Lógica de negativos para gastos
-            let amount = r.amount || (r.totals.bs);
-            let account = r.account || 'cashBs'; // Fallback
+            // Si hay información de Bs (Origen y Destino)
+            let amountBs = r.totals.bs || 0;
 
+            // Detectar Origen para RESTAR
+            if (r.from === 'bank') bank = -amountBs;
+            if (r.from === 'cashBs') cashBs = -amountBs;
+
+            // Detectar Destino para SUMAR
+            if (r.to === 'bank') bank += amountBs; // Nota: si es bank->bank, se cancela a 0, correcto.
+            if (r.to === 'cashBs') cashBs += amountBs;
+        }
+        else if (r.type === 'expense') {
+            let amount = r.amount || 0;
+            let account = r.account || 'cashBs';
             if (r.currency === 'usd') cashUsd = -amount;
             else if (r.currency === 'usdt') usdt = -amount;
             else {
-                if (account === 'cashBs') cashBs = -amount;
                 if (account === 'bank') bank = -amount;
+                else cashBs = -amount;
             }
         }
 
-        csvContent += `${date},${time},${type},"${detail}",${bank.toFixed(2)},${cashBs.toFixed(2)},${cashUsd.toFixed(2)},${usdt.toFixed(2)}\n`;
+        csvContent += `${date},${time},${displayType},"${detail}",${bank.toFixed(2)},${cashBs.toFixed(2)},${cashUsd.toFixed(2)},${usdt.toFixed(2)}\n`;
     });
 
-    // === 4. TOTALES DE RENTABILIDAD (FÓRMULA EXACTA DE LA PANTALLA) ===
+    // 5. Calcular Totales Finales (El saldo REAL actual, independientemente de lo filtrado)
+    // Usamos la misma fórmula que en Rentabilidad para asegurar que el cuadre final sea correcto
     const shift = db.currentShift;
-
     const finalCashBs = db.config.initialCapitalBs + db.balance.cashBs + shift.payments.efectivo - shift.changeGivenBs;
-
     const finalCashUsd = db.config.initialCapitalUsd + db.balance.cashUsd + shift.payments.divisa - shift.changeGivenUsd;
-
-    const finalBank = db.balance.bank + shift.payments.punto + shift.payments.pago_movil - shift.changeGivenDigital;
-
-    const finalUsdt = db.balance.usdt;
+    const finalBank = (db.config.initialCapitalBank || 0) + db.balance.bank + shift.payments.punto + shift.payments.pago_movil - shift.changeGivenDigital;
+    const finalUsdt = (db.config.initialCapitalUsdt || 0) + db.balance.usdt;
 
     csvContent += `TOTAL,,,,${finalBank.toFixed(2)},${finalCashBs.toFixed(2)},${finalCashUsd.toFixed(2)},${finalUsdt.toFixed(2)}\n`;
 
-
-
-    // 5. Descargar
+    // 6. Descargar
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.getElementById('csv-download');
     const url = URL.createObjectURL(blob);
 
     link.setAttribute('href', url);
-    link.setAttribute('download', `Reporte_Completo_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `Reporte_Mensual_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1867,110 +1947,86 @@ function deleteCategory(id) {
 // === FUNCIÓN AUXILIAR PARA RENDERIZAR SOLO LA TABLA DE REPORTES ===
 // Esto evita que se borre el input y pierda el foco al escribir
 function renderReportTable() {
-    const allRecords = db.sales.concat(db.history);
+    // 1. Unir todo
+    let allRecords = db.sales.concat(db.history);
+
+    // 2. FILTRO DE LIMPIEZA: Quitamos Ventas y Aperturas (Punto 1)
+    allRecords = allRecords.filter(r => r.type !== 'sale' && r.type !== 'opening');
+
+    // Filtros de búsqueda (fecha, tipo)
     const filterType = document.getElementById('rep-filter-type')?.value || 'all';
     const searchTerm = document.getElementById('rep-search')?.value.toLowerCase() || '';
 
     let filtered = allRecords.filter(r => {
         const matchesType = filterType === 'all' || r.type === filterType;
-        // Buscamos en concepto o en la fecha
         const matchesSearch = r.concept ? r.concept.toLowerCase().includes(searchTerm)
             : r.dateStr.toLowerCase().includes(searchTerm);
         return matchesType && matchesSearch;
     });
 
-    // Ordenar por fecha (más reciente primero)
+    // Ordenar
     filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     const tbody = document.getElementById('rep-table-body');
     if (!tbody) return;
 
     let rows = filtered.map(r => {
-        // Variables para las columnas
+        // Inicializar variables
         let bank = 0;
         let cashBs = 0;
         let cashUsd = 0;
         let usdt = 0;
 
-        // --- LÓGICA POR TIPO DE REGISTRO ---
+        // --- LÓGICA POR TIPO (ACTUALIZADA) ---
 
-        if (r.type === 'sale' || !r.type) {
-            // VENTA: Sumamos a las cuentas donde se pagó
+        if (r.type === 'closing') {
+            // PUNTO 2: Asegurar que el Cierre muestre los montos guardados
             if (r.payments) {
                 bank = (r.payments.pago_movil || 0) + (r.payments.punto || 0);
-                cashBs = (r.payments.efectivo || 0) - (r.change?.bs || 0); // Efectivo neto (menos cambio)
-                cashUsd = (r.payments.divisa || 0) - (r.change?.usd || 0);
+                cashBs = (r.payments.efectivo || 0); // Aquí no restamos cambio porque el cierre suele ser el bruto guardado
+                cashUsd = (r.payments.divisa || 0);
             }
-        }
-        else if (r.type === 'opening') {
-            // APERTURA: Se considera entrada de dinero al fondo
-            if (r.payments) {
-                cashBs = r.payments.efectivo || 0;
-                cashUsd = r.payments.divisa || 0;
-            }
-        }
-        else if (r.type === 'closing') {
-            // CIERRE: Solo informativo en el detalle, no sumamos para no duplicar en el reporte
-            // (El cierre es la suma de todo lo anterior)
         }
         else if (r.type === 'expense') {
-            // GASTO: Restamos de la cuenta seleccionada
             let amount = r.amount || 0;
             let currency = r.currency || 'bs';
-
-            if (currency === 'usd') {
-                cashUsd = -amount;
-            } else if (currency === 'usdt') {
-                usdt = -amount;
-            } else {
-                // Bs
+            if (currency === 'usd') cashUsd = -amount;
+            else if (currency === 'usdt') usdt = -amount;
+            else {
                 if (r.account === 'bank') bank = -amount;
                 else cashBs = -amount;
             }
         }
         else if (r.type === 'transfer') {
-            // TRANSFERENCIA: (Requiere que hayas hecho el Paso 3 para funcionar 100% en futuros registros)
-            // Si el registro tiene 'from' y 'to' (nuevo formato):
             if (r.from && r.to) {
-                // Restamos del ORIGEN
-                if (r.from === 'bank') bank = -r.totals.bs;
-                if (r.from === 'cashBs') cashBs = -r.totals.bs;
-
-                // Sumamos al DESTINO
-                if (r.to === 'bank') bank += r.totals.bs; // Raro bank a bank pero posible
-                if (r.to === 'usdt') usdt = r.totals.usdt;
-            } else {
-                // Fallback para registros viejos que no tienen from/to guardado
-                // Intentamos adivinar por el concepto o el total de usdt
-                if (r.totals && r.totals.usdt > 0) {
-                    usdt = r.totals.usdt; // Asumimos que llegó a USDT
-                    // Asumimos que salió de Efectivo Bs (por defecto del sistema)
-                    cashBs = -r.totals.bs;
-                }
+                let amountBs = r.totals.bs || 0;
+                // Restar origen
+                if (r.from === 'bank') bank = -amountBs;
+                if (r.from === 'cashBs') cashBs = -amountBs;
+                // Sumar destino
+                if (r.to === 'bank') bank += amountBs;
+                if (r.to === 'cashBs') cashBs += amountBs;
+                // USDT
+                if (r.to === 'usdt') usdt = r.totals.usdt || 0;
             }
         }
 
-        // Formatear números (ocultar si es 0)
+        // Formateadores
         const fmt = (n) => n !== 0 ? n.toFixed(2) : '-';
-
-        // Estilo de texto (Rojo si es negativo)
         const style = (n) => n < 0 ? 'color: var(--danger);' : '';
 
-        // Determinar etiqueta y detalle
+        // Etiquetas en ESPAÑOL para la pantalla
         let typeLabel = '';
-        let details = r.concept || '';
-
-        if (r.type === 'sale' || !r.type) typeLabel = `<span class="text-green-600 font-bold">Venta</span>`;
-        else if (r.type === 'opening') typeLabel = `<span class="text-yellow-600">Apertura</span>`;
-        else if (r.type === 'closing') typeLabel = `<span class="text-blue-600">Cierre</span>`;
+        if (r.type === 'closing') typeLabel = `<span class="text-blue-600 font-bold">Cierre</span>`;
         else if (r.type === 'expense') typeLabel = `<span class="text-red-600">Gasto</span>`;
         else if (r.type === 'transfer') typeLabel = `<span class="text-purple-600">Transferencia</span>`;
+        else typeLabel = r.type;
 
         return `
             <tr>
                 <td class="text-xs text-gray-500">${r.dateStr.split(',')[0]}</td>
                 <td>${typeLabel}</td>
-                <td>${details}</td>
+                <td>${r.concept || ''}</td>
                 <td class="text-right" style="${style(bank)}">${fmt(bank)}</td>
                 <td class="text-right" style="${style(cashBs)}">${fmt(cashBs)}</td>
                 <td class="text-right" style="${style(cashUsd)}">${fmt(cashUsd)}</td>
@@ -1979,7 +2035,7 @@ function renderReportTable() {
         `;
     }).join('');
 
-    tbody.innerHTML = rows.length > 0 ? rows : '<tr><td colspan="7" class="text-center p-4">No hay registros</td></tr>';
+    tbody.innerHTML = rows.length > 0 ? rows : '<tr><td colspan="7" class="text-center p-4">No hay registros filtrados</td></tr>';
 }
 
 function closeMonthAndReset() {
@@ -2000,6 +2056,8 @@ function closeMonthAndReset() {
     // 3. Pasar ese dinero a Capital Inicial (Para que no desaparezca de la pantalla)
     db.config.initialCapitalBs = finalCashBs;
     db.config.initialCapitalUsd = finalCashUsd;
+    db.config.initialCapitalUsdt = finalUsdt;
+    db.config.initialCapitalBank = finalBank;
 
     // 4. Limpiar Historial y Ventas
     db.sales = [];
@@ -2016,4 +2074,190 @@ function closeMonthAndReset() {
     saveDB();
     showToast("¡Mes Cerrado! Nuevo ciclo iniciado.");
     navTo('inicio');
+}
+
+// Lógica Calculadora
+let calcExpression = "";
+
+function toggleCalculator() {
+    const modal = document.getElementById('calc-modal');
+    modal.classList.toggle('hidden');
+
+    // Si estamos ABRRIENDO la calculadora (quitamos la clase hidden)
+    if (!modal.classList.contains('hidden')) {
+        // 1. Limpiamos la variable interna
+        calcExpression = "";
+        // 2. Limpiamos lo que se ve en la pantalla
+        document.getElementById('calc-display').value = "";
+        // 3. Ponemos el foco para escribir rápido
+        document.getElementById('calc-display').focus();
+    }
+}
+
+function calcInput(val) {
+    const display = document.getElementById('calc-display');
+
+    if (val === 'C') {
+        calcExpression = "";
+        display.value = "";
+        return;
+    }
+
+    // Evitar múltiples operadores seguidos
+    const lastChar = calcExpression.slice(-1);
+    const operators = ['+', '-', '*', '/'];
+    if (operators.includes(val) && operators.includes(lastChar)) {
+        return;
+    }
+
+    calcExpression += val;
+    display.value = calcExpression;
+}
+
+function calcBackspace() {
+    calcExpression = calcExpression.slice(0, -1);
+    document.getElementById('calc-display').value = calcExpression;
+}
+
+function calcResult() {
+    const display = document.getElementById('calc-display');
+    try {
+        // Usamos Function para evaluar de forma segura (en este contexto local)
+        // Nota: eval() es peligroso en web pública, pero seguro en un POS local sin inputs externos.
+        if (calcExpression.trim() === "") return;
+        const result = new Function('return ' + calcExpression)();
+
+        // Limitar decimales a 2 para dinero
+        display.value = parseFloat(result.toFixed(2));
+        calcExpression = String(parseFloat(result.toFixed(2))); // Guardar el resultado para seguir operando
+    } catch (e) {
+        display.value = "Error";
+        calcExpression = "";
+    }
+}
+
+// Cerrar calculadora si hago clic fuera
+window.addEventListener('click', (e) => {
+    const btn = document.getElementById('calc-float-btn');
+    const modal = document.getElementById('calc-modal');
+    if (!btn.contains(e.target) && !modal.contains(e.target)) {
+        modal.classList.add('hidden');
+    }
+});
+
+// Función para cambiar entre Modo Botón y Modo Input
+function togglePayMode() {
+    const isFull = document.getElementById('full-pay-toggle').checked;
+    const btnContainer = document.getElementById('container-pay-buttons');
+    const inputContainer = document.getElementById('container-pay-inputs');
+
+    if (isFull) {
+        btnContainer.classList.remove('hidden');
+        inputContainer.classList.add('hidden');
+        // Al volver a botones, limpiamos selecciones visuales
+        document.querySelectorAll('.btn-pay-mode').forEach(b => b.classList.remove('active'));
+    } else {
+        btnContainer.classList.add('hidden');
+        inputContainer.classList.remove('hidden');
+    }
+    calculateTotals(); // Recalcular por si acaso
+}
+
+// Función para pago rápido (Click en botón)
+function quickPay(method) {
+    // 1. Calcular Total a Pagar
+    let totalSaleBs = 0;
+    db.cart.forEach(item => {
+        let priceBs = item.priceBs || (item.priceUsd * db.config.rateUsd);
+        totalSaleBs += (priceBs * item.qty);
+    });
+
+    // 2. Limpiar todos los valores primero
+    document.getElementById('pay-efectivo').value = '';
+    document.getElementById('pay-pm').value = '';
+    document.getElementById('pay-punto').value = '';
+    document.getElementById('pay-divisa').value = '';
+
+    // Quitar clase activa de todos los botones
+    document.querySelectorAll('.btn-pay-mode').forEach(b => b.classList.remove('active'));
+
+    // 3. Poner valor en el método seleccionado
+    const rate = db.config.rateUsd;
+
+    if (method === 'efectivo') {
+        document.getElementById('pay-efectivo').value = totalSaleBs.toFixed(2);
+        document.getElementById('btn-efectivo').classList.add('active');
+    } else if (method === 'pago_movil') {
+        document.getElementById('pay-pm').value = totalSaleBs.toFixed(2);
+        document.getElementById('btn-pago_movil').classList.add('active');
+    } else if (method === 'punto') {
+        document.getElementById('pay-punto').value = totalSaleBs.toFixed(2);
+        document.getElementById('btn-punto').classList.add('active');
+    } else if (method === 'divisa') {
+        document.getElementById('pay-divisa').value = (totalSaleBs / rate).toFixed(2);
+        document.getElementById('btn-divisa').classList.add('active');
+    }
+
+    // 4. Calcular totales (mostrará cambio 0 o vuelto)
+    calculateTotals();
+}
+
+function saveManualSale() {
+    // 1. Obtener valores
+    const bs = parseFloat(document.getElementById('manual-efec').value) || 0;
+    const usd = parseFloat(document.getElementById('manual-div').value) || 0;
+    const pm = parseFloat(document.getElementById('manual-pm').value) || 0;
+    const punto = parseFloat(document.getElementById('manual-punto').value) || 0;
+
+    if (bs === 0 && usd === 0 && pm === 0 && punto === 0) {
+        showToast("Ingresa al menos un monto");
+        return;
+    }
+
+    // 2. Calcular total en Bs
+    const totalBs = bs + pm + punto + (usd * db.config.rateUsd);
+
+    // 3. Crear registro falso de venta
+    const manualRecord = {
+        id: Date.now(),
+        ticketNumber: "MANUAL-" + Math.floor(Math.random() * 1000), // Ticket ficticio
+        date: new Date(),
+        dateStr: "Venta Manual - " + new Date().toLocaleTimeString(),
+        type: 'sale', // Es vital que sea 'sale' para que sume en el cierre
+        items: [], // Array vacío = no toca inventario
+        totals: { bs: totalBs, usd: totalBs / db.config.rateUsd },
+        payments: {
+            efectivo: bs,
+            pago_movil: pm,
+            punto: punto,
+            divisa: usd
+        },
+        change: { bs: 0, usd: 0 },
+        status: 'active'
+    };
+
+    // 4. Actualizar Turno Actual (Caja Abierta)
+    const shift = db.currentShift;
+    if (!shift.isOpen) {
+        showToast("Error: Debe tener la caja abierta");
+        return;
+    }
+
+    shift.salesCount++; // Aumenta contador de tickets
+    shift.totalSoldBs += totalBs; // Aumenta dinero total del día
+
+    // Sumar a las formas de pago
+    shift.payments.efectivo += bs;
+    shift.payments.pago_movil += pm;
+    shift.payments.punto += punto;
+    shift.payments.divisa += usd;
+
+    // 5. Guardar
+    db.sales.push(manualRecord);
+    saveDB();
+
+    // 6. Feedback
+    closeModal('modal-manual-sale');
+    showToast("Venta Manual Registrada Correctamente");
+    navTo('inicio'); // Refrescar la pantalla para ver el nuevo dinero
 }

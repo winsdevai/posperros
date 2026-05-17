@@ -123,7 +123,12 @@
                         <input type="number" id="new-prod-price-usd" class="input-field" placeholder="0.00">
                     </div>
                 </div>
-
+                <!-- NUEVO: INPUT DE IMAGEN -->
+                <div class="input-group">
+                    <label class="input-label">Link de Imagen</label>
+                    <input type="text" id="new-prod-img" class="input-field"
+                        placeholder="https://ejemplo.com/hamburguesa.jpg">
+                </div>
                 <!-- BLOQUE CORRECTO DE STOCK (Con lógica de suma/resta) -->
                 <div class="input-group">
                     <label class="input-label" id="lbl-stock-mode">Stock Inicial</label>
@@ -174,34 +179,6 @@
                     <!-- Se llena con JS -->
                 </div>
 
-                <h4 class="mb-2 font-bold">Métodos de Pago</h4>
-                <div class="payments-section" id="payments-container">
-
-                    <div class="payment-row">
-                        <span class="pay-label">💵 Efectivo Bs</span>
-                        <input type="number" id="pay-efectivo" class="payment-input" placeholder="0.00"
-                            oninput="calculateTotals()">
-                    </div>
-
-                    <div class="payment-row">
-                        <span class="pay-label">📱 Pago Móvil</span>
-                        <input type="number" id="pay-pm" class="payment-input" placeholder="0.00"
-                            oninput="calculateTotals()">
-                    </div>
-
-                    <div class="payment-row">
-                        <span class="pay-label">💳 Punto (Bs)</span>
-                        <input type="number" id="pay-punto" class="payment-input" placeholder="0.00"
-                            oninput="calculateTotals()">
-                    </div>
-
-                    <div class="payment-row">
-                        <span class="pay-label">💲 Divisa ($)</span>
-                        <input type="number" id="pay-divisa" class="payment-input" placeholder="0.00"
-                            oninput="calculateTotals()">
-                    </div>
-
-                </div>
 
                 <!-- Totales -->
                 <div class="totals-box">
@@ -220,6 +197,55 @@
                     <div class="total-final" style="margin-top:5px; border-top:1px solid #ccc; padding-top:5px;">
                         <span>Total Pagado:</span>
                         <span id="lbl-final-total">0.00 Bs</span>
+                    </div>
+                </div>
+
+                <h4 class="mb-2 font-bold">Métodos de Pago</h4>
+
+                <!-- CHECKBOX MODO PAGO -->
+                <div class="mb-2 p-2 bg-gray-100 rounded flex items-center gap-2">
+                    <input type="checkbox" id="full-pay-toggle" checked onchange="togglePayMode()"
+                        class="w-5 h-5 cursor-pointer">
+                    <label for="full-pay-toggle" class="cursor-pointer font-bold select-none">Pago Completo (Un solo
+                        método)</label>
+                </div>
+
+                <!-- CONTENEDOR DE BOTONES (Pago Rápido - Visible por defecto) -->
+                <div id="container-pay-buttons" class="grid grid-cols-2 gap-2">
+                    <button onclick="quickPay('efectivo')" id="btn-efectivo"
+                        class="btn-pay-mode btn btn-secondary w-full py-2">Efectivo (Bs)</button>
+                    <button onclick="quickPay('divisa')" id="btn-divisa"
+                        class="btn-pay-mode btn btn-secondary w-full py-2">Divisa ($)</button>
+                    <button onclick="quickPay('pago_movil')" id="btn-pago_movil"
+                        class="btn-pay-mode btn btn-secondary w-full py-2">Pago Móvil</button>
+                    <button onclick="quickPay('punto')" id="btn-punto"
+                        class="btn-pay-mode btn btn-secondary w-full py-2">Punto de Venta</button>
+                </div>
+
+                                <!-- CONTENEDOR DE INPUTS (Diseño 2x2) -->
+                <div id="container-pay-inputs" class="hidden grid grid-cols-2 gap-3">
+                    <!-- Arriba Izquierda -->
+                    <div class="flex flex-col items-center p-2 border rounded bg-white">
+                        <span class="text-2xl mb-1">💵 Efec. Bs</span>
+                        <input type="number" id="pay-efectivo" class="input-field w-full text-center" placeholder="0.00" oninput="calculateTotals()">
+                    </div>
+
+                    <!-- Arriba Derecha -->
+                    <div class="flex flex-col items-center p-2 border rounded bg-white">
+                        <span class="text-2xl mb-1">💳 Punto</span>
+                        <input type="number" id="pay-punto" class="input-field w-full text-center" placeholder="0.00" oninput="calculateTotals()">
+                    </div>
+
+                    <!-- Abajo Izquierda -->
+                    <div class="flex flex-col items-center p-2 border rounded bg-white">
+                        <span class="text-2xl mb-1">📱 P. Móvil</span>
+                        <input type="number" id="pay-pm" class="input-field w-full text-center" placeholder="0.00" oninput="calculateTotals()">
+                    </div>
+
+                    <!-- Abajo Derecha -->
+                    <div class="flex flex-col items-center p-2 border rounded bg-white">
+                        <span class="text-2xl mb-1">💲 Divisa</span>
+                        <input type="number" id="pay-divisa" class="input-field w-full text-center" placeholder="0.00" oninput="calculateTotals()">
                     </div>
                 </div>
 
@@ -298,104 +324,182 @@
     </div>
 
     <!-- === MODAL GASTOS (ACTUALIZADO) === -->
-<div id="modal-expense" class="modal-overlay">
-    <div class="modal-card">
-        <div class="modal-header">
-            <span class="modal-title">Registrar Gasto</span>
-            <button class="close-modal" onclick="closeModal('modal-expense')">&times;</button>
-        </div>
-        <div class="modal-body">
-            <div class="input-group">
-                <label class="input-label">Concepto (Ej: Compra Insumos)</label>
-                <input type="text" id="exp-concept" class="input-field" placeholder="Razón del gasto">
+    <div id="modal-expense" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">Registrar Gasto</span>
+                <button class="close-modal" onclick="closeModal('modal-expense')">&times;</button>
             </div>
-            
-            <div class="flex gap-2">
-                <div class="input-group w-full">
-                    <label class="input-label">Moneda</label>
-                    <!-- AGREGADO onchange Y style="direction: ltr" -->
-                    <select id="exp-currency" class="input-field" style="direction: ltr;" onchange="updateExpAccounts()">
-                        <option value="bs">Bolívares (Bs)</option>
-                        <option value="usd">Dólares ($)</option>
-                        <option value="usdt">USDT</option>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label class="input-label">Concepto (Ej: Compra Insumos)</label>
+                    <input type="text" id="exp-concept" class="input-field" placeholder="Razón del gasto">
+                </div>
+
+                <div class="flex gap-2">
+                    <div class="input-group w-full">
+                        <label class="input-label">Moneda</label>
+                        <!-- AGREGADO onchange Y style="direction: ltr" -->
+                        <select id="exp-currency" class="input-field" style="direction: ltr;"
+                            onchange="updateExpAccounts()">
+                            <option value="bs">Bolívares (Bs)</option>
+                            <option value="usd">Dólares ($)</option>
+                            <option value="usdt">USDT</option>
+                        </select>
+                    </div>
+                    <div class="input-group w-full">
+                        <label class="input-label">Monto</label>
+                        <!-- AGREGADO style="direction: ltr" -->
+                        <input type="number" id="exp-amount" class="input-field" placeholder="0.00"
+                            style="direction: ltr;">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Cuenta a debitar</label>
+                    <select id="exp-account" class="input-field">
+                        <!-- Se llena dinámicamente con JS -->
                     </select>
                 </div>
-                <div class="input-group w-full">
-                    <label class="input-label">Monto</label>
-                    <!-- AGREGADO style="direction: ltr" -->
-                    <input type="number" id="exp-amount" class="input-field" placeholder="0.00" style="direction: ltr;">
-                </div>
-            </div>
 
-            <div class="input-group">
-                <label class="input-label">Cuenta a debitar</label>
-                <select id="exp-account" class="input-field">
-                    <!-- Se llena dinámicamente con JS -->
-                </select>
+                <button onclick="saveExpense()" class="btn btn-danger w-full">Registrar Gasto</button>
             </div>
-
-            <button onclick="saveExpense()" class="btn btn-danger w-full">Registrar Gasto</button>
         </div>
     </div>
-</div>
 
-<!-- === MODAL TRANSFERENCIA (ACTUALIZADO) === -->
-<div id="modal-transfer" class="modal-overlay">
-    <div class="modal-card">
-        <div class="modal-header">
-            <span class="modal-title">Transferencia</span>
-            <button class="close-modal" onclick="closeModal('modal-transfer')">&times;</button>
-        </div>
-        <div class="modal-body">
-            <div class="flex gap-2">
-                <div class="input-group w-full">
-                    <label class="input-label">De:</label>
-                    <select id="trans-from" class="input-field">
-                        <option value="cashBs">Efectivo Bs</option>
-                        <option value="bank">Banco (Bs)</option>
-                    </select>
-                </div>
-                <div class="input-group w-full">
-                    <label class="input-label">Para:</label>
-                    <select id="trans-to" class="input-field">
-                        <option value="usdt">USDT (Binance)</option>
-                        <option value="bank">Banco (Bs)</option>
-                    </select>
-                </div>
+    <!-- === MODAL TRANSFERENCIA (ACTUALIZADO) === -->
+    <div id="modal-transfer" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">Transferencia</span>
+                <button class="close-modal" onclick="closeModal('modal-transfer')">&times;</button>
             </div>
-            <div class="input-group">
-                <label class="input-label">Monto a Mover</label>
-                <input type="number" id="trans-amount" class="input-field" placeholder="0.00">
+            <div class="modal-body">
+                <div class="flex gap-2">
+                    <div class="input-group w-full">
+                        <label class="input-label">De:</label>
+                        <select id="trans-from" class="input-field">
+                            <option value="cashBs">Efectivo Bs</option>
+                            <option value="bank">Banco (Bs)</option>
+                        </select>
+                    </div>
+                    <div class="input-group w-full">
+                        <label class="input-label">Para:</label>
+                        <select id="trans-to" class="input-field">
+                            <option value="usdt">USDT (Binance)</option>
+                            <option value="bank">Banco (Bs)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Monto a Mover</label>
+                    <input type="number" id="trans-amount" class="input-field" placeholder="0.00">
+                </div>
+                <p id="trans-hint" class="text-xs text-gray-500 mb-2">Se usará la Tasa Binance
+                    (${db.config.rateBinance}) si es a USDT.</p>
+                <button onclick="saveTransfer()" class="btn btn-primary w-full">Procesar Transferencia</button>
             </div>
-            <p id="trans-hint" class="text-xs text-gray-500 mb-2">Se usará la Tasa Binance (${db.config.rateBinance}) si es a USDT.</p>
-            <button onclick="saveTransfer()" class="btn btn-primary w-full">Procesar Transferencia</button>
         </div>
     </div>
-</div>
 
-<!-- === MODAL GESTIÓN CATEGORÍAS === -->
-<div id="modal-category" class="modal-overlay">
-    <div class="modal-card">
-        <div class="modal-header">
-            <span class="modal-title" id="cat-modal-title">Categoría</span>
-            <button class="close-modal" onclick="closeModal('modal-category')">&times;</button>
-        </div>
-        <div class="modal-body">
-            <input type="hidden" id="cat-id">
-            <div class="input-group">
-                <label class="input-label">Nombre</label>
-                <input type="text" id="cat-name" class="input-field" placeholder="Ej: Postres">
+    <!-- === MODAL GESTIÓN CATEGORÍAS === -->
+    <div id="modal-category" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title" id="cat-modal-title">Categoría</span>
+                <button class="close-modal" onclick="closeModal('modal-category')">&times;</button>
             </div>
-            <div class="input-group">
-                <label class="input-label">Emoji (Icono)</label>
-                <input type="text" id="cat-icon" class="input-field" placeholder="Ej: 🍦">
+            <div class="modal-body">
+                <input type="hidden" id="cat-id">
+                <div class="input-group">
+                    <label class="input-label">Nombre</label>
+                    <input type="text" id="cat-name" class="input-field" placeholder="Ej: Postres">
+                </div>
+                <div class="input-group">
+                    <!-- Cambié de Emoji a Link de Imagen -->
+                    <label class="input-label">Link de Imagen (o Emoji)</label>
+                    <input type="text" id="cat-icon" class="input-field"
+                        placeholder="https://ejemplo.com/imagen.png (o deja emoji)">
+                </div>
+                <button onclick="saveCategory()" class="btn btn-success w-full">Guardar Categoría</button>
             </div>
-            <button onclick="saveCategory()" class="btn btn-success w-full">Guardar Categoría</button>
         </div>
     </div>
-</div>
 
-<a id="csv-download" href="#" style="display:none;">Descargar</a>
+    <!-- BOTÓN FLOTANTE CALCULADORA -->
+    <div id="calc-float-btn" onclick="toggleCalculator()" title="Abrir Calculadora">
+        🧮
+    </div>
+
+    <!-- MODAL CALCULADORA -->
+    <div id="calc-modal" class="hidden calc-modal-style">
+        <div class="calc-header">
+            <span>Calculadora</span>
+            <button onclick="toggleCalculator()" class="calc-close">×</button>
+        </div>
+        <input type="text" id="calc-display" readonly class="calc-display">
+        <div class="calc-keys">
+            <button onclick="calcInput('C')" class="btn-calc btn-red">C</button>
+            <button onclick="calcInput('/')" class="btn-calc btn-op">/</button>
+            <button onclick="calcInput('*')" class="btn-calc btn-op">×</button>
+            <button onclick="calcBackspace()" class="btn-calc btn-op">⌫</button>
+
+            <button onclick="calcInput('7')" class="btn-calc">7</button>
+            <button onclick="calcInput('8')" class="btn-calc">8</button>
+            <button onclick="calcInput('9')" class="btn-calc">9</button>
+            <button onclick="calcInput('-')" class="btn-calc btn-op">-</button>
+
+            <button onclick="calcInput('4')" class="btn-calc">4</button>
+            <button onclick="calcInput('5')" class="btn-calc">5</button>
+            <button onclick="calcInput('6')" class="btn-calc">6</button>
+            <button onclick="calcInput('+')" class="btn-calc btn-op">+</button>
+
+            <button onclick="calcInput('1')" class="btn-calc">1</button>
+            <button onclick="calcInput('2')" class="btn-calc">2</button>
+            <button onclick="calcInput('3')" class="btn-calc">3</button>
+            <button onclick="calcResult()" class="btn-calc btn-equal" style="grid-row: span 2;">=</button>
+
+            <button onclick="calcInput('0')" class="btn-calc" style="grid-column: span 2;">0</button>
+            <button onclick="calcInput('.')" class="btn-calc">.</button>
+        </div>
+    </div>
+
+    <!-- === MODAL VENTA MANUAL (CAJA EXTRA) === -->
+    <div id="modal-manual-sale" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <span class="modal-title">Registrar Venta Manual (Caja Extra)</span>
+                <button class="close-modal" onclick="closeModal('modal-manual-sale')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm text-gray-600 mb-4">Use esto para sumar dinero de otra caja o dispositivo a este
+                    reporte. No afecta el inventario.</p>
+
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div>
+                        <label class="input-label text-xs">Efectivo (Bs)</label>
+                        <input type="number" id="manual-efec" class="input-field w-full" value="0">
+                    </div>
+                    <div>
+                        <label class="input-label text-xs">Divisa ($)</label>
+                        <input type="number" id="manual-div" class="input-field w-full" value="0">
+                    </div>
+                    <div>
+                        <label class="input-label text-xs">Pago Móvil (Bs)</label>
+                        <input type="number" id="manual-pm" class="input-field w-full" value="0">
+                    </div>
+                    <div>
+                        <label class="input-label text-xs">Punto (Bs)</label>
+                        <input type="number" id="manual-punto" class="input-field w-full" value="0">
+                    </div>
+                </div>
+
+                <button onclick="saveManualSale()" class="btn btn-primary w-full">Registrar en Turno Actual</button>
+            </div>
+        </div>
+    </div>
+
+    <a id="csv-download" href="#" style="display:none;">Descargar</a>
 
     <!-- === TOASTS & PRINT === -->
     <div id="toast-container"></div>
