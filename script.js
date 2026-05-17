@@ -459,6 +459,7 @@ function verifyPin() {
 function enterAdmin() {
     posView.classList.add('hidden');
     adminView.classList.remove('hidden');
+    checkPendingSales(); 
     navTo('inicio');
 }
 function exitAdmin() {
@@ -2468,4 +2469,13 @@ function downloadGoalsCSV() {
     link.href = URL.createObjectURL(blob);
     link.download = `Reporte_Rentabilidad_USD_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
+}
+
+// === FUNCIÓN PARA VERIFICAR CIERRE PENDIENTE ===
+function checkPendingSales() {
+    // Si hay ventas en db.sales y la caja está marcada como abierta
+    if (db.sales.length > 0 && db.currentShift.isOpen) {
+        // Mostramos el modal de advertencia
+        openModal('modal-pending-closing');
+    }
 }

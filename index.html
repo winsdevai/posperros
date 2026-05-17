@@ -460,7 +460,7 @@
 
     <!-- BOTÓN FLOTANTE CALCULADORA -->
     <div id="calc-float-btn" onclick="toggleCalculator()" title="Abrir Calculadora">
-        🧮
+        ➗
     </div>
 
     <!-- MODAL CALCULADORA -->
@@ -530,6 +530,26 @@
             </div>
         </div>
     </div>
+
+    <!-- === MODAL ALERTA DE CIERRE PENDIENTE === -->
+<div id="modal-pending-closing" class="modal-overlay">
+    <div class="modal-card" style="border: 3px solid #f59e0b; max-width: 400px;">
+        <div class="modal-header" style="background-color: #fffbeb; border-bottom: 1px solid #f59e0b;">
+            <span class="modal-title" style="color: #b45309;">⚠️ Caja Pendiente</span>
+            <button class="close-modal" onclick="closeModal('modal-pending-closing')">&times;</button>
+        </div>
+        <div class="modal-body text-center">
+            <p class="mb-4 font-bold text-lg">Tiene ventas sin cerrar</p>
+            <p class="mb-4 text-sm text-gray-600">
+                Se detectaron ventas de días anteriores (ej. Miércoles) que aún no han sido cerradas.
+                Esto puede afectar sus reportes.
+            </p>
+            <button onclick="closeModal('modal-pending-closing'); navTo('inicio');" class="btn btn-primary w-full" style="background-color: #f59e0b; border: none;">
+                Ir a Cerrar Caja
+            </button>
+        </div>
+    </div>
+</div>
 
     <a id="csv-download" href="#" style="display:none;">Descargar</a>
 

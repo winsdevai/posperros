@@ -1,7 +1,7 @@
 :root {
     --primary: #2563eb;
     --secondary: #1e40af;
-    --bg-body: #dbff77;
+    --bg-body: #dfff2c;
     --bg-card: #ff763f;
     --text-main: #1f2937;
     --text-light: #6b7280;
@@ -415,7 +415,7 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
     right: 20px;
     width: 60px;
     height: 60px;
-    background-color: var(--primary); /* Usa tu color primario */
+    background-color: var(--bg-card); /* Usa tu color primario */
     color: white;
     border-radius: 50%;
     display: flex;
