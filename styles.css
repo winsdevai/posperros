@@ -1,8 +1,8 @@
 :root {
     --primary: #2563eb;
     --secondary: #1e40af;
-    --bg-body: #efff16;
-    --bg-card: #ff763f;
+    --bg-body: #f3f4f6;
+    --bg-card: #891414;
     --text-main: #1f2937;
     --text-light: #6b7280;
     --danger: #ef4444;
@@ -40,7 +40,7 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
 }
 
 #logo-trigger {
-    font-size: 1.2rem; font-weight: 800; color: white; background-color: transparent;
+    font-size: 1.2rem; font-weight: 800; color: #f0b156; background-color: transparent;
     user-select: none; padding: 5px 10px; border-radius: 5px; border: 2px solid transparent;
 }
 #logo-trigger:active { background-color: #e5e7eb; }
@@ -111,7 +111,6 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
 
 .modal-header { padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
 .modal-title { font-size: 1.2rem; font-weight: bold; }
-.close-modal { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
 .modal-body { padding: 1rem; }
 
 /* Formularios */
@@ -253,8 +252,24 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
 .cart-item-info { flex: 1; }
 .cart-item-name { font-weight: bold; font-size: 0.95rem; }
 .cart-item-detail { font-size: 0.8rem; color: #666; }
-.cart-remove-btn { color: var(--danger); font-size: 1.2rem; padding: 0 10px; cursor: pointer; }
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 2rem; /* Aumentado de 1.5rem */
+    cursor: pointer;
+    color: #666;
+    line-height: 1;
+    padding: 0 5px;
+}
 
+.cart-remove-btn {
+    color: var(--danger);
+    font-size: 1.5rem; /* Aumentado */
+    padding: 0 10px;
+    cursor: pointer;
+    width: 40px; /* Le damos ancho para que sea fácil de tocar */
+    text-align: center;
+}
 .payments-section {
     background: #f9fafb; padding: 1rem; border-radius: 8px; margin-top: 1rem;
 }
@@ -545,4 +560,26 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
 .metas-table td {
     padding: 8px;
     border-bottom: 1px solid #eee;
+}
+
+/* Ocultar nombre de producto en el grid principal */
+#product-container .product-info .font-bold {
+    display: none;
+}
+
+/* Ajustar precios al fondo de la tarjeta */
+#product-container .product-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Contenedor flexible para precios */
+.price-split {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 5px 5px 5px;
+    font-size: 0.85rem;
+    font-weight: bold;
 }
