@@ -1,62 +1,113 @@
 // ==========================================
-// SISTEMA POS - SCRIPT.JS (ACTUALIZADO)
+// SISTEMA DE BASE DE DATOS (INDEXEDDB) - VERSIÓN ROBUSTA
 // ==========================================
+const DB_NAME = "POS_SYSTEM_DB";
+const DB_VERSION = 1;
 
-// --- BASE DE DATOS LOCAL ---
-const defaultDB = {
-    config: {
-        pin: "1234",
-        ticketCounter: 1,
-        rateUsd: 600,
-        rateBinance: 600,
-        initialCapitalBs: 0,
-        initialCapitalUsd: 0,
-        initialCapitalUsdt: 0,
-        initialCapitalBank: 0
-    },
-    categories: [
-        { id: 1, name: "Hamburguesas", icon: "🍔" },
-        { id: 2, name: "Perros Calientes", icon: "🌭" },
-        { id: 3, name: "Bebidas", icon: "🥤" }
-    ],
-    products: [
-        {
-            id: 1, categoryId: 1, name: "Hamburguesa Clásica",
-            priceUsd: 1.50, purchasePrice: 0.50, stock: 50,
-            image: "🍔", ingredients: ["Pan", "Carne", "Lechuga", "Tomate", "Queso"]
-        },
-        {
-            id: 2, categoryId: 3, name: "Pepsi 500ml",
-            priceUsd: 0.80, purchasePrice: 0.30, stock: 100,
-            image: "🥤", ingredients: []
-        }
-    ],
+// Datos por defecto
+let db = {
+    config: { pin: "1234", ticketCounter: 1, rateUsd: 600, rateBinance: 600, initialCapitalBs: 0, initialCapitalUsd: 0, initialCapitalUsdt: 0, initialCapitalBank: 0 },
+    categories: [{ id: 1, name: "Hamburguesas", icon: "🍔" }, { id: 2, name: "Perros Calientes", icon: "🌭" }, { id: 3, name: "Bebidas", icon: "🥤" }],
+    products: [{ id: 1, categoryId: 1, name: "Hamburguesa Clásica", priceUsd: 1.50, purchasePrice: 0.50, stock: 50, image: "🍔", ingredients: ["Pan", "Carne", "Lechuga", "Tomate", "Queso"] }],
     cart: [],
     sales: [],
     history: [],
-    balance: {
-        cashBs: 0,
-        cashUsd: 0,
-        bank: 0,
-        usdt: 0
-    },
-    currentShift: {
-        isOpen: false,
-        openingAmountBs: 0,
-        openingAmountUsd: 0,
-        payments: { efectivo: 0, pago_movil: 0, punto: 0, divisa: 0 },
-        changeGivenBs: 0,
-        changeGivenUsd: 0,
-        changeGivenDigital: 0,
-        salesCount: 0,
-        totalSoldBs: 0,
-        dailyGoal: 0,
-        totalProfit: 0
-    }
-
+    balance: { cashBs: 0, cashUsd: 0, bank: 0, usdt: 0 },
+    currentShift: { isOpen: false, openingAmountBs: 0, openingAmountUsd: 0, payments: { efectivo: 0, pago_movil: 0, punto: 0, divisa: 0 }, changeGivenBs: 0, changeGivenUsd: 0, changeGivenDigital: 0, salesCount: 0, totalSoldBs: 0, dailyGoal: 0, totalProfit: 0 }
 };
 
-let db = JSON.parse(localStorage.getItem('pos_db')) || defaultDB;
+// Variable para guardar la conexión activa (no el request)
+let idbDatabase = null;
+
+function initDB() {
+    return new Promise((resolve, reject) => {
+        // 1. Verificar si el navegador soporta IndexedDB
+        if (!window.indexedDB) {
+            console.warn("Navegador no soporta IndexedDB. Usando LocalStorage como respaldo.");
+            const stored = localStorage.getItem('pos_db');
+            if (stored) {
+                try { db = JSON.parse(stored); } catch(e) { console.error(e); }
+            }
+            resolve();
+            return;
+        }
+
+        // 2. Intentar abrir
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = (event) => {
+            const database = event.target.result;
+            if (!database.objectStoreNames.contains('data')) {
+                database.createObjectStore('data');
+            }
+        };
+
+        request.onsuccess = (event) => {
+            // GUARDAMOS LA CONEXIÓN AQUÍ
+            idbDatabase = event.target.result;
+            loadData(idbDatabase).then(resolve);
+        };
+
+        request.onerror = (event) => {
+            console.error("Error crítico IndexedDB, usando LocalStorage:", event);
+            // Fallback a LocalStorage si falla la DB
+            const stored = localStorage.getItem('pos_db');
+            if (stored) {
+                try { db = JSON.parse(stored); } catch(e) { console.error(e); }
+            }
+            resolve();
+        };
+    });
+}
+
+function loadData(database) {
+    return new Promise((resolve) => {
+        const transaction = database.transaction(['data'], 'readonly');
+        const store = transaction.objectStore('data');
+        const request = store.get('state');
+
+        request.onsuccess = (event) => {
+            if (event.target.result) {
+                db = event.target.result;
+                sanitizeDB();
+            }
+            resolve();
+        };
+
+        request.onerror = () => resolve(); 
+    });
+}
+
+function saveDB() {
+    // Si no hay conexión DB, guardamos en localStorage por seguridad (fallback automático)
+    if (!idbDatabase) {
+        console.warn("IndexedDB no lista, guardando en LocalStorage temporalmente.");
+        localStorage.setItem('pos_db', JSON.stringify(db));
+        return;
+    }
+
+    const transaction = idbDatabase.transaction(['data'], 'readwrite');
+    const store = transaction.objectStore('data');
+    const request = store.put(db, 'state');
+
+    request.onsuccess = () => {
+        // Opcional: guardar backup en localStorage también
+        // localStorage.setItem('pos_db', JSON.stringify(db)); 
+    };
+
+    request.onerror = (e) => {
+        console.error("Error guardando en IndexedDB, intentando LocalStorage:", e);
+        localStorage.setItem('pos_db', JSON.stringify(db));
+    };
+}
+
+// INICIALIZACIÓN PRINCIPAL
+document.addEventListener('DOMContentLoaded', async () => {
+    await initDB(); // Esperamos a que cargue IndexedDB
+    updateCartBadge();
+    renderCategories();
+});
+
 let lowStockMode = false;
 
 function toggleLowStock() {
@@ -118,11 +169,6 @@ function sanitizeDB() {
     }
 }
 
-function saveDB() {
-    localStorage.setItem('pos_db', JSON.stringify(db));
-}
-
-
 // --- ELEMENTOS DOM ---
 const posView = document.getElementById('pos-view');
 const adminView = document.getElementById('admin-view');
@@ -130,13 +176,6 @@ const contentArea = document.getElementById('admin-content-area');
 const logoTrigger = document.getElementById('logo-trigger');
 const cartBadge = document.getElementById('cart-count');
 const sidebar = document.getElementById('sidebar');
-
-// --- INICIALIZACIÓN ---
-document.addEventListener('DOMContentLoaded', () => {
-    sanitizeDB();
-    updateCartBadge();
-    renderCategories();
-});
 
 // ==========================================
 // LÓGICA POS (Navegación y Renderizado)
@@ -161,25 +200,20 @@ function renderCategories() {
 
         // --- LÓGICA AUTOMÁTICA DE IMAGEN VS EMOJI ---
         let iconDisplay = cat.icon;
-
-        // Si el texto empieza con http o https, lo convertimos en etiqueta <img>
         if (cat.icon && (cat.icon.startsWith('http') || cat.icon.startsWith('https'))) {
-            iconDisplay = `<img src="${cat.icon}" style="width:60px; height:60px; object-fit:contain;">`;
+            // Usamos object-fit: contain para que se vea completo y centrado
+            iconDisplay = `<img src="${cat.icon}" style="width:80%; height:80%; object-fit:contain;">`;
         } else if (cat.icon && cat.icon.startsWith('<img>')) {
-            // Si ya pegaron una etiqueta img completa, la usamos tal cual
             iconDisplay = cat.icon;
         }
         // Si no es ninguna de las anteriores, deja el texto (emoji) tal cual.
         // ---------------------------------------------------------------
 
         card.innerHTML = `
-            <div class="product-img-placeholder" style="height: 80px; font-size: 2.5rem; display:flex; align-items:center; justify-content:center;">
-                ${iconDisplay}
-            </div>
-            <div class="product-info">
-                <div class="font-bold text-lg">${cat.name}</div>
-            </div>
-        `;
+    <div class="product-img-placeholder" style="height: 100%; width: 100%; font-size: 2.5rem; display:flex; align-items:center; justify-content:center;">
+        ${iconDisplay}
+    </div>
+`;
         card.onclick = () => openCategory(cat.id);
         catContainer.appendChild(card);
     });
@@ -219,11 +253,10 @@ function openCategory(catId) {
 
         card.innerHTML = `
             <div class="product-img-placeholder ${stockClass}" style="padding:0; overflow:hidden;">${imgDisplay}</div>
-            <div class="product-info">
-                <div class="font-bold text-sm">${p.name}</div>
-                <div class="price-tag">$${p.priceUsd}</div>
-                <div class="text-xs text-gray-400">${priceBs} Bs</div>
-            </div>
+            <div class="price-split">
+        <span style="color: #01ff16;">$${p.priceUsd}</span>
+        <span style="color: #ffffff;">${priceBs} Bs</span>
+    </div>
         `;
         prodContainer.appendChild(card);
     });
@@ -459,7 +492,6 @@ function verifyPin() {
 function enterAdmin() {
     posView.classList.add('hidden');
     adminView.classList.remove('hidden');
-    checkPendingSales(); 
     navTo('inicio');
 }
 function exitAdmin() {
@@ -822,7 +854,7 @@ function navTo(section) {
                 </table>
             </div>
         `;
-        } else if (section === 'metas') {
+    } else if (section === 'metas') {
         const closings = db.history.filter(h => h.type === 'closing' && h.dailyGoal !== undefined);
 
         let rows = closings.map(c => {
@@ -830,12 +862,12 @@ function navTo(section) {
             const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
             const dayName = days[dateObj.getDay()];
 
-            const grossUsd = c.totals.usd || 0; 
+            const grossUsd = c.totals.usd || 0;
             const netProfitUsd = c.totalProfit || 0;
 
             // === NUEVA FÓRMULA ===
             const diff = netProfitUsd - c.dailyGoal;
-            
+
             // Lógica de Colores:
             // Si es < 0 (Negativo): ROJO (Faltó dinero / Deuda)
             // Si es > 0 (Positivo): VERDE (Sobró dinero / Ganancia extra)
@@ -1224,7 +1256,7 @@ function renderCartItems() {
                 <div class="cart-item-detail"> $${unitPriceUsd} c/u | ${totalItemBs} Bs ${item.note ? '| ' + item.note : ''}</div>
             </div>
             
-            <div class="cart-remove-btn" onclick="confirmRemoveItem(${index})">&times;</div>
+            <div class="cart-remove-btn" onclick="removeCartItem(${index})" style="font-size: 1.5rem;">&times;</div>
         `;
         container.appendChild(row);
     });
@@ -1746,7 +1778,6 @@ function resetSystem() {
     showConfirm(
         "¿ESTÁS SEGURO? Se borrará TODO. No hay vuelta atrás.",
         () => {
-            localStorage.removeItem('pos_db');
             location.reload(); // Recargar la página para reiniciar todo
         }
     );
@@ -2187,74 +2218,6 @@ function closeMonthAndReset() {
     navTo('inicio');
 }
 
-// Lógica Calculadora
-let calcExpression = "";
-
-function toggleCalculator() {
-    const modal = document.getElementById('calc-modal');
-    modal.classList.toggle('hidden');
-
-    // Si estamos ABRRIENDO la calculadora (quitamos la clase hidden)
-    if (!modal.classList.contains('hidden')) {
-        // 1. Limpiamos la variable interna
-        calcExpression = "";
-        // 2. Limpiamos lo que se ve en la pantalla
-        document.getElementById('calc-display').value = "";
-        // 3. Ponemos el foco para escribir rápido
-        document.getElementById('calc-display').focus();
-    }
-}
-
-function calcInput(val) {
-    const display = document.getElementById('calc-display');
-
-    if (val === 'C') {
-        calcExpression = "";
-        display.value = "";
-        return;
-    }
-
-    // Evitar múltiples operadores seguidos
-    const lastChar = calcExpression.slice(-1);
-    const operators = ['+', '-', '*', '/'];
-    if (operators.includes(val) && operators.includes(lastChar)) {
-        return;
-    }
-
-    calcExpression += val;
-    display.value = calcExpression;
-}
-
-function calcBackspace() {
-    calcExpression = calcExpression.slice(0, -1);
-    document.getElementById('calc-display').value = calcExpression;
-}
-
-function calcResult() {
-    const display = document.getElementById('calc-display');
-    try {
-        // Usamos Function para evaluar de forma segura (en este contexto local)
-        // Nota: eval() es peligroso en web pública, pero seguro en un POS local sin inputs externos.
-        if (calcExpression.trim() === "") return;
-        const result = new Function('return ' + calcExpression)();
-
-        // Limitar decimales a 2 para dinero
-        display.value = parseFloat(result.toFixed(2));
-        calcExpression = String(parseFloat(result.toFixed(2))); // Guardar el resultado para seguir operando
-    } catch (e) {
-        display.value = "Error";
-        calcExpression = "";
-    }
-}
-
-// Cerrar calculadora si hago clic fuera
-window.addEventListener('click', (e) => {
-    const btn = document.getElementById('calc-float-btn');
-    const modal = document.getElementById('calc-modal');
-    if (!btn.contains(e.target) && !modal.contains(e.target)) {
-        modal.classList.add('hidden');
-    }
-});
 
 // Función para cambiar entre Modo Botón y Modo Input
 function togglePayMode() {
@@ -2407,8 +2370,8 @@ function updateProgressBar() {
     if (shift.isOpen && shift.dailyGoal > 0) {
         container.style.display = 'block';
 
-         let percent = (shift.totalProfit / shift.dailyGoal) * 100;
-        if (percent < 0) percent = 0; 
+        let percent = (shift.totalProfit / shift.dailyGoal) * 100;
+        if (percent < 0) percent = 0;
 
         fill.style.width = percent + "%";
         percentSpan.innerText = percent.toFixed(1) + "%";
@@ -2441,7 +2404,7 @@ function downloadGoalsCSV() {
         const dateObj = new Date(c.date);
         const dayName = days[dateObj.getDay()];
         const dateStr = dateObj.toLocaleDateString();
-        
+
         const grossUsd = c.totals.usd || 0;
         const netProfitUsd = c.totalProfit || 0;
         const count = c.salesCount || 0;
@@ -2449,7 +2412,7 @@ function downloadGoalsCSV() {
         // === NUEVA FÓRMULA: Ganancia - Meta ===
         // Si Ganancia < Meta -> Resultado NEGATIVO (Deuda/Faltante)
         // Si Ganancia > Meta -> Resultado POSITIVO (Extra/Sobrante)
-        const diff = netProfitUsd - c.dailyGoal; 
+        const diff = netProfitUsd - c.dailyGoal;
         // ========================================
 
         totalGoal += c.dailyGoal;
@@ -2469,13 +2432,4 @@ function downloadGoalsCSV() {
     link.href = URL.createObjectURL(blob);
     link.download = `Reporte_Rentabilidad_USD_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
-}
-
-// === FUNCIÓN PARA VERIFICAR CIERRE PENDIENTE ===
-function checkPendingSales() {
-    // Si hay ventas en db.sales y la caja está marcada como abierta
-    if (db.sales.length > 0 && db.currentShift.isOpen) {
-        // Mostramos el modal de advertencia
-        openModal('modal-pending-closing');
-    }
 }
