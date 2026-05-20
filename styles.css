@@ -78,8 +78,15 @@ body { background-color: var(--bg-body); color: var(--text-main); height: 100vh;
 }
 .product-card:active { transform: scale(0.98); }
 .product-img-placeholder {
-    width: 100%; height: 100px; background-color: #e5e7eb;
-    display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 2rem;
+    width: 100%;
+    height: 100%; /* Ocupa todo el alto de la tarjeta */
+    background-color: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* ESTA LÍNEA ES CLAVE */
+    overflow: hidden; 
 }
 .product-info { padding: 0.5rem; text-align: center; }
 .price-tag { font-size: 0.8rem; color: var(--text-light); margin-top: 4px; }

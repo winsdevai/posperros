@@ -26,7 +26,7 @@ function initDB() {
             console.warn("Navegador no soporta IndexedDB. Usando LocalStorage como respaldo.");
             const stored = localStorage.getItem('pos_db');
             if (stored) {
-                try { db = JSON.parse(stored); } catch(e) { console.error(e); }
+                try { db = JSON.parse(stored); } catch (e) { console.error(e); }
             }
             resolve();
             return;
@@ -53,7 +53,7 @@ function initDB() {
             // Fallback a LocalStorage si falla la DB
             const stored = localStorage.getItem('pos_db');
             if (stored) {
-                try { db = JSON.parse(stored); } catch(e) { console.error(e); }
+                try { db = JSON.parse(stored); } catch (e) { console.error(e); }
             }
             resolve();
         };
@@ -74,7 +74,7 @@ function loadData(database) {
             resolve();
         };
 
-        request.onerror = () => resolve(); 
+        request.onerror = () => resolve();
     });
 }
 
@@ -201,13 +201,12 @@ function renderCategories() {
         // --- LÓGICA AUTOMÁTICA DE IMAGEN VS EMOJI ---
         let iconDisplay = cat.icon;
         if (cat.icon && (cat.icon.startsWith('http') || cat.icon.startsWith('https'))) {
-            // Usamos object-fit: contain para que se vea completo y centrado
-            iconDisplay = `<img src="${cat.icon}" style="width:80%; height:80%; object-fit:contain;">`;
+            // CAMBIO AQUÍ: width 100%, height 100%, object-fit: cover
+            // Esto hace que la imagen llene todo el contenedor
+            iconDisplay = `<img src="${cat.icon}" style="width:100%; height:100%; object-fit:cover;">`;
         } else if (cat.icon && cat.icon.startsWith('<img>')) {
             iconDisplay = cat.icon;
         }
-        // Si no es ninguna de las anteriores, deja el texto (emoji) tal cual.
-        // ---------------------------------------------------------------
 
         card.innerHTML = `
     <div class="product-img-placeholder" style="height: 100%; width: 100%; font-size: 2.5rem; display:flex; align-items:center; justify-content:center;">
