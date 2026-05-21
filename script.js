@@ -267,6 +267,7 @@ function openCategory(catId) {
 let currentProduct = null;
 let currentIngredients = {};
 let currentQuantity = 1;
+let extras = { puraPapa: false, llevar: false };
 
 function openProductModal(productId) {
     // --- BLOQUEO DE SEGURIDAD ---
@@ -288,6 +289,7 @@ function openProductModal(productId) {
     // Resetear estado
     currentQuantity = 1;
     currentIngredients = {};
+    extras = { puraPapa: false, llevar: false };
 
     if (currentProduct.ingredients && currentProduct.ingredients.length > 0) {
         currentProduct.ingredients.forEach(ing => currentIngredients[ing] = true);
@@ -320,6 +322,15 @@ function updateModalProductUI() {
     } else {
         list.innerHTML = '<p class="text-sm text-gray-500">Este producto no tiene modificaciones.</p>';
     }
+
+    const btnPapa = document.getElementById('btn-pura-papa');
+    const btnLlevar = document.getElementById('btn-llevar');
+
+    if (extras.puraPapa) btnPapa.classList.add('active');
+    else btnPapa.classList.remove('active');
+
+    if (extras.llevar) btnLlevar.classList.add('active');
+    else btnLlevar.classList.remove('active');
 }
 
 function changeQty(delta) {
@@ -337,9 +348,39 @@ function toggleIngredient(ing) {
     updateModalProductUI();
 }
 
+function toggleExtra(extraKey) {
+    extras[extraKey] = !extras[extraKey];
+    updateModalProductUI();
+}
+
 function addToCart(stayInModal) {
     const disabledIngs = Object.keys(currentIngredients).filter(k => !currentIngredients[k]);
-    const note = disabledIngs.length > 0 ? `Sin: ${disabledIngs.join(', ')}` : '';
+
+    // --- NUEVA LÓGICA DE NOTA ---
+    let notes = [];
+    if (disabledIngs.length > 0) {
+        notes.push(`Sin: ${disabledIngs.join(', ')}`);
+    }
+    if (extras.puraPapa) {
+        notes.push("Pura Papa");
+    }
+    if (extras.llevar) {
+        notes.push("Llevar");
+    } else {
+        // Reset para el siguiente item (Agregar y Mantener)
+        currentQuantity = 1;
+        currentIngredients = {};
+
+        // <--- AGREGA ESTA LÍNEA AQUÍ:
+        extras = { puraPapa: false, llevar: false };
+
+        if (currentProduct.ingredients) {
+            currentProduct.ingredients.forEach(ing => currentIngredients[ing] = true);
+        }
+        updateModalProductUI();
+    }
+    const note = notes.join(' | ');
+    // -----------------------------
 
     // Descontar Stock (Lógica de venta)
     if (currentProduct.stock < currentQuantity) {

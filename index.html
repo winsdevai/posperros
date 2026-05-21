@@ -36,10 +36,10 @@
         </main>
 
         <div id="goal-bar-container"
-            style="position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; padding: 5px 10px; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); z-index: 40; display: none;">
+            style="position: fixed; bottom: 0; left: 0; width: 100%; background: #891414; padding: 5px 10px; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); z-index: 40; display: none;">
             <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;">
-                <span id="goal-text">Meta del día</span>
-                <span id="goal-percent">0%</span>
+                <span id="goal-text" style="color: #fff;">Meta del día</span>
+                <span id="goal-percent" style="color: #fff;">0%</span>
             </div>
             <div style="width: 100%; height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden;">
                 <div id="goal-progress-fill"
@@ -101,7 +101,12 @@
                     <button class="qty-btn" onclick="changeQty(1)">+</button>
                 </div>
 
-                <label class="input-label text-left">Ingredientes / Contornos</label>
+                <div style="display: flex; justify-content: center; gap: 10px; margin-top: 10px; margin-bottom: 5px;">
+                    <div id="btn-pura-papa" class="ing-chip" onclick="toggleExtra('puraPapa')">🍟 Pura Papa</div>
+                    <div id="btn-llevar" class="ing-chip" onclick="toggleExtra('llevar')">🛍️ Llevar</div>
+                </div>
+
+                <label class="input-label text-left">Contornos</label>
                 <div id="modal-ing-list" class="ingredients-list justify-center"></div>
 
                 <div class="mt-6">
